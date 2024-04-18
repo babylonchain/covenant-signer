@@ -320,12 +320,13 @@ func (w *BtcClient) SignPsbt(packet *psbt.Packet) (*psbt.Packet, error) {
 	}
 
 	sign := true
+	deriv := false
 	result, err := w.RpcClient.WalletProcessPsbt(
 		psbtEncoded,
 		&sign,
 		// TODO: Hacky way of forcing bitcoind to use sighash DEFAULT
 		"DEFAULT",
-		nil,
+		&deriv,
 	)
 
 	if err != nil {

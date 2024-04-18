@@ -29,7 +29,6 @@ func (s *PsbtSigner) RawSignature(ctx context.Context, request *SigningRequest) 
 	if err := staking.IsSimpleTransfer(request.UnbondingTransaction); err != nil {
 		return nil, fmt.Errorf("invalid unbonding transaction: %w", err)
 	}
-
 	psbtPacket, err := psbt.New(
 		[]*wire.OutPoint{&request.UnbondingTransaction.TxIn[0].PreviousOutPoint},
 		request.UnbondingTransaction.TxOut,
@@ -42,13 +41,23 @@ func (s *PsbtSigner) RawSignature(ctx context.Context, request *SigningRequest) 
 		return nil, fmt.Errorf("failed to create PSBT packet with unbonding transaction: %w", err)
 	}
 
+	var covenantKeys psbt.Bip32Sorter
+	// psbt.Bip32Sorter
+
+	for _, key := range request.CovenantPublicKeys {
+		k := key
+		covenantKeys = append(covenantKeys, &psbt.Bip32Derivation{
+			PubKey: k.SerializeCompressed(),
+		})
+	}
+
+	fmt.Printf("There is %d covenant keys\n", len(covenantKeys))
+
+	// sort.Sort(covenantKeys)
+	//
 	psbtPacket.Inputs[0].SighashType = txscript.SigHashDefault
 	psbtPacket.Inputs[0].WitnessUtxo = request.StakingOutput
-	psbtPacket.Inputs[0].Bip32Derivation = []*psbt.Bip32Derivation{
-		{
-			PubKey: request.CovenantPublicKey.SerializeCompressed(),
-		},
-	}
+	psbtPacket.Inputs[0].Bip32Derivation = covenantKeys
 
 	ctrlBlockBytes, err := request.SpendDescription.ControlBlock.ToBytes()
 
@@ -64,11 +73,19 @@ func (s *PsbtSigner) RawSignature(ctx context.Context, request *SigningRequest) 
 		},
 	}
 
+	fmt.Println("***************************************")
+	fmt.Println("Before signing")
+	fmt.Println(psbtPacket.Inputs[0])
+
 	signedPacket, err := s.client.SignPsbt(psbtPacket)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign PSBT packet: %w", err)
 	}
+
+	fmt.Println("***************************************")
+	fmt.Println("After signing")
+	fmt.Println(signedPacket.Inputs[0])
 
 	if len(signedPacket.Inputs[0].TaprootScriptSpendSig) == 0 {
 		// this can happen if btcwallet does not maintain the private key for the

@@ -2,6 +2,7 @@ package signerapp
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 
@@ -24,6 +25,7 @@ type SigningRequest struct {
 	StakingOutput        *wire.TxOut
 	UnbondingTransaction *wire.MsgTx
 	CovenantPublicKey    *btcec.PublicKey
+	CovenantPublicKeys   []*btcec.PublicKey
 	SpendDescription     *SpendPathDescription
 }
 
@@ -129,6 +131,11 @@ func (s *SignerApp) SignUnbondingTransaction(
 		return nil, fmt.Errorf("staking tx is not mature")
 	}
 
+	fmt.Println("Keys before parsing")
+	for _, k := range params.CovenantPublicKeys {
+		fmt.Println(hex.EncodeToString(k.SerializeCompressed()))
+	}
+
 	parsedStakingTransaction, err := btcstaking.ParseV0StakingTx(
 		stakingTxInfo.Tx,
 		params.MagicBytes,
@@ -138,6 +145,10 @@ func (s *SignerApp) SignUnbondingTransaction(
 
 	if err != nil {
 		return nil, err
+	}
+	fmt.Println("Keys after parsing")
+	for _, k := range params.CovenantPublicKeys {
+		fmt.Println(hex.EncodeToString(k.SerializeCompressed()))
 	}
 
 	// TODO Add more checs for unbonding tx:
@@ -169,6 +180,7 @@ func (s *SignerApp) SignUnbondingTransaction(
 		StakingOutput:        parsedStakingTransaction.StakingOutput,
 		UnbondingTransaction: unbondingTx,
 		CovenantPublicKey:    covnentSignerPubKey,
+		CovenantPublicKeys:   params.CovenantPublicKeys,
 		SpendDescription: &SpendPathDescription{
 			ControlBlock: &unbondingPathInfo.ControlBlock,
 			ScriptLeaf:   &unbondingPathInfo.RevealedLeaf,
