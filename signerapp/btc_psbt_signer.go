@@ -25,6 +25,8 @@ func NewPsbtSigner(client *btcclient.BtcClient) *PsbtSigner {
 	}
 }
 
+// TODO: Figure out how to sign complex taproot scripts using psbt packets sent
+// to bitcoind. It may require using descriptors wallets.
 func (s *PsbtSigner) RawSignature(ctx context.Context, request *SigningRequest) (*SigningResult, error) {
 	if err := staking.IsSimpleTransfer(request.UnbondingTransaction); err != nil {
 		return nil, fmt.Errorf("invalid unbonding transaction: %w", err)

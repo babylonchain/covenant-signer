@@ -24,6 +24,7 @@ type SigningRequest struct {
 	StakingOutput        *wire.TxOut
 	UnbondingTransaction *wire.MsgTx
 	CovenantPublicKey    *btcec.PublicKey
+	CovenantAddress      btcutil.Address
 	SpendDescription     *SpendPathDescription
 }
 
@@ -81,6 +82,18 @@ func NewSignerApp(
 		p:      p,
 		net:    net,
 	}
+}
+
+func (s *SignerApp) pubKeyToAddress(pubKey *btcec.PublicKey) (btcutil.Address, error) {
+	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
+	witnessAddr, err := btcutil.NewAddressWitnessPubKeyHash(
+		pubKeyHash, s.net,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+	return witnessAddr, nil
 }
 
 func (s *SignerApp) SignUnbondingTransaction(
@@ -165,10 +178,17 @@ func (s *SignerApp) SignUnbondingTransaction(
 		return nil, err
 	}
 
+	covenantKeyAddress, err := s.pubKeyToAddress(covnentSignerPubKey)
+
+	if err != nil {
+		return nil, err
+	}
+
 	sig, err := s.s.RawSignature(ctx, &SigningRequest{
 		StakingOutput:        parsedStakingTransaction.StakingOutput,
 		UnbondingTransaction: unbondingTx,
 		CovenantPublicKey:    covnentSignerPubKey,
+		CovenantAddress:      covenantKeyAddress,
 		SpendDescription: &SpendPathDescription{
 			ControlBlock: &unbondingPathInfo.ControlBlock,
 			ScriptLeaf:   &unbondingPathInfo.RevealedLeaf,

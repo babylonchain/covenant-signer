@@ -137,14 +137,23 @@ func StartManager(
 	localCovenantKey, err := btcec.ParsePubKey(covenantPubKeyBytes)
 	require.NoError(t, err)
 
+	remoteCovenantKey1, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	require.NotNil(t, remoteCovenantKey1)
+	remoteCovenantKey2, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	require.NotNil(t, remoteCovenantKey2)
+
 	mb := []byte{0x0, 0x1, 0x2, 0x3}
 	appConfig.Server.Host = "127.0.0.1"
 	appConfig.Server.Port = 10090
-	appConfig.Params.CovenantQuorum = 1
+	appConfig.Params.CovenantQuorum = 2
 	appConfig.Params.MagicBytes = hex.EncodeToString(mb)
 	appConfig.Params.W = 1
 	appConfig.Params.CovenantPublicKeys = []string{
 		hex.EncodeToString(localCovenantKey.SerializeCompressed()),
+		hex.EncodeToString(remoteCovenantKey1.PubKey().SerializeCompressed()),
+		hex.EncodeToString(remoteCovenantKey2.PubKey().SerializeCompressed()),
 	}
 
 	parsedconfig, err := appConfig.Parse()
@@ -152,7 +161,7 @@ func StartManager(
 
 	// In e2e test we are using the same node for signing as for indexing funcitonalities
 	chainInfo := signerapp.NewBitcoindChainInfo(client)
-	signer := signerapp.NewPsbtSigner(client)
+	signer := signerapp.NewPrivKeySigner(client)
 	paramsGetter := signerapp.NewConfigParamsRetriever(parsedconfig.ParamsConfig)
 
 	app := signerapp.NewSignerApp(
