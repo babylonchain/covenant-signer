@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/babylonchain/covenant-signer/signerservice"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/psbt"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -36,6 +38,36 @@ var (
 	eventuallyPollInterval = 100 * time.Millisecond
 	eventuallyTimeout      = 10 * time.Second
 )
+
+const (
+	// Point with unknown discrete logarithm defined in: https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs
+	// using it as internal public key effectively disables taproot key spends
+	unspendableKeyPath = "0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+)
+
+var (
+	unspendableKeyPathKey = unspendableKeyPathInternalPubKeyInternal(unspendableKeyPath)
+)
+
+func unspendableKeyPathInternalPubKeyInternal(keyHex string) btcec.PublicKey {
+	keyBytes, err := hex.DecodeString(keyHex)
+
+	if err != nil {
+		panic(fmt.Sprintf("unexpected error: %v", err))
+	}
+
+	// We are using btcec here, as key is 33 byte compressed format.
+	pubKey, err := btcec.ParsePubKey(keyBytes)
+
+	if err != nil {
+		panic(fmt.Sprintf("unexpected error: %v", err))
+	}
+	return *pubKey
+}
+
+func unspendableKeyPathInternalPubKey() btcec.PublicKey {
+	return unspendableKeyPathKey
+}
 
 type TestManager struct {
 	t                   *testing.T
@@ -357,6 +389,38 @@ func ATestSigningUnbondingTx(t *testing.T) {
 	require.NoError(t, err)
 }
 
+type Descriptor struct {
+	Desc      string `json:"desc"`
+	Timestamp string `json:"timestamp"`
+}
+
+type ImportDescriptorsCmd struct {
+	Descriptors []Descriptor
+}
+
+// (*CreateRawTransactionCmd)(nil)
+func init() {
+	btcjson.MustRegisterCmd("importdescriptors", (*ImportDescriptorsCmd)(nil), btcjson.UsageFlag(0))
+}
+
+func ImportDescriptors(c *btcclient.BtcClient, descriptor string) ([]byte, error) {
+
+	descriptorObj := []Descriptor{
+		{
+			Desc:      descriptor,
+			Timestamp: "now",
+		},
+	}
+
+	bytes, err := json.Marshal(descriptorObj)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return c.RpcClient.RawRequest("importdescriptors", []json.RawMessage{bytes})
+}
+
 func TestDebugPsbtSigning(t *testing.T) {
 	// Setup bitcoind
 	m, err := containers.NewManager()
@@ -371,8 +435,27 @@ func TestDebugPsbtSigning(t *testing.T) {
 	// Setup Wallet
 	passphrase := "pass"
 	_ = h.CreateWallet("test-wallet", passphrase)
-	// only outputs which are 100 deep are mature
 	_ = h.GenerateBlocks(int(100) + 100)
+
+	// prepare all staking  parameters outside of covenant wallet
+	// ***************************************
+
+	stakerKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	require.NotNil(t, stakerKey)
+
+	fpKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	require.NotNil(t, fpKey)
+
+	remoteCovenantKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	require.NotNil(t, remoteCovenantKey)
+
+	stakingAmount := btcutil.Amount(100000)
+	stakingTime := uint16(10000)
+
+	// ***************************************
 
 	appConfig := config.DefaultConfig()
 	appConfig.BtcNodeConfig.Host = "127.0.0.1:18443"
@@ -391,29 +474,13 @@ func TestDebugPsbtSigning(t *testing.T) {
 	err = client.UnlockWallet(60*60*60, passphrase)
 	require.NoError(t, err)
 
-	// prepare all parameters outside of covenant wallet
-	stakerKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	require.NotNil(t, stakerKey)
-
-	fpKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	require.NotNil(t, fpKey)
-
-	stakingAmount := btcutil.Amount(100000)
-	stakingTime := uint16(10000)
-
 	localCovenantMemberPubKey := getNewPubKeyInWallet(t, client, "covenant")
-
-	remoteCovenantKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	require.NotNil(t, remoteCovenantKey)
 
 	covenantKeys := []*btcec.PublicKey{
 		localCovenantMemberPubKey,
 		// TODO: Figure out how enable signing with multiple covenant members through
 		// psbt's
-		// remoteCovenantKey.PubKey(),
+		remoteCovenantKey.PubKey(),
 	}
 
 	stakingInfo, err := btcstaking.BuildStakingInfo(
@@ -444,6 +511,7 @@ func TestDebugPsbtSigning(t *testing.T) {
 	stakingPathControlBytes, err := stakingPathInfo.ControlBlock.ToBytes()
 	require.NoError(t, err)
 	require.NotNil(t, stakingPathControlBytes)
+	stakingPathLeafHash := stakingPathInfo.RevealedLeaf.TapHash()
 
 	unbondingPathInfo, err := stakingInfo.UnbondingPathSpendInfo()
 	require.NoError(t, err)
@@ -484,6 +552,23 @@ func TestDebugPsbtSigning(t *testing.T) {
 	rawUnbondingTx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(&stakingTxHash, 0), nil, nil))
 	rawUnbondingTx.AddTxOut(unbondingInfo.UnbondingOutput)
 
+	internalKey := unspendableKeyPathInternalPubKey()
+	taprootOutputKey := txscript.ComputeTaprootOutputKey(
+		&internalKey, treeRootNode.CloneBytes(),
+	)
+
+	descriptor := fmt.Sprintf("rawtr(%s)", hex.EncodeToString(schnorr.SerializePubKey(taprootOutputKey)))
+
+	resp, err := client.RpcClient.GetDescriptorInfo(descriptor)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	fmt.Println("Got descriptor")
+	fmt.Println(resp)
+
+	res, err := ImportDescriptors(client, descriptor)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
 	// build unbonding transactions via psbt packet
 	psbtPacket, err := psbt.New(
 		[]*wire.OutPoint{wire.NewOutPoint(&stakingTxHash, 0)},
@@ -501,6 +586,21 @@ func TestDebugPsbtSigning(t *testing.T) {
 	psbtPacket.Inputs[0].WitnessScript = unbondingPathInfo.RevealedLeaf.Script
 	psbtPacket.Inputs[0].TaprootBip32Derivation = []*psbt.TaprootBip32Derivation{
 		{
+			XOnlyPubKey: schnorr.SerializePubKey(stakerKey.PubKey()),
+			LeafHashes: [][]byte{
+				stakingPathLeafHash.CloneBytes(),
+				unbondingPathLeafHash.CloneBytes(),
+				slashingPathLeafHash.CloneBytes(),
+			},
+		},
+		{
+			XOnlyPubKey: schnorr.SerializePubKey(fpKey.PubKey()),
+			LeafHashes: [][]byte{
+				unbondingPathLeafHash.CloneBytes(),
+				slashingPathLeafHash.CloneBytes(),
+			},
+		},
+		{
 			XOnlyPubKey: schnorr.SerializePubKey(localCovenantMemberPubKey),
 			LeafHashes: [][]byte{
 				unbondingPathLeafHash.CloneBytes(),
@@ -517,9 +617,19 @@ func TestDebugPsbtSigning(t *testing.T) {
 	}
 	psbtPacket.Inputs[0].TaprootLeafScript = []*psbt.TaprootTapLeafScript{
 		{
+			ControlBlock: stakingPathControlBytes,
+			Script:       stakingPathInfo.RevealedLeaf.Script,
+			LeafVersion:  stakingPathInfo.RevealedLeaf.LeafVersion,
+		},
+		{
 			ControlBlock: unbondingPathCtrlBlockBytes,
 			Script:       unbondingPathInfo.RevealedLeaf.Script,
 			LeafVersion:  unbondingPathInfo.RevealedLeaf.LeafVersion,
+		},
+		{
+			ControlBlock: slashingPathControlBytes,
+			Script:       slashingPathInfo.RevealedLeaf.Script,
+			LeafVersion:  slashingPathInfo.RevealedLeaf.LeafVersion,
 		},
 	}
 
