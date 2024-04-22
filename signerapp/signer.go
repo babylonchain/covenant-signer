@@ -1,6 +1,7 @@
 package signerapp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -54,6 +55,8 @@ type BabylonParams struct {
 	CovenantQuorum     uint32
 	MagicBytes         []byte
 	W                  uint32
+	UnbondingTime      uint16
+	UnbondingFee       btcutil.Amount
 }
 
 type BabylonParamsRetriever interface {
@@ -94,6 +97,18 @@ func (s *SignerApp) pubKeyToAddress(pubKey *btcec.PublicKey) (btcutil.Address, e
 		return nil, err
 	}
 	return witnessAddr, nil
+}
+
+func outputsAreEqual(a *wire.TxOut, b *wire.TxOut) bool {
+	if a.Value != b.Value {
+		return false
+	}
+
+	if !bytes.Equal(a.PkScript, b.PkScript) {
+		return false
+	}
+
+	return true
 }
 
 func (s *SignerApp) SignUnbondingTransaction(
@@ -153,10 +168,38 @@ func (s *SignerApp) SignUnbondingTransaction(
 		return nil, err
 	}
 
-	// TODO Add more checs for unbonding tx:
-	// - wheter it has valid taproot output
-	// - wheter it has correct fee
-	// - wheter commits to valid script etc.
+	expectedUnbondingOutputValue := parsedStakingTransaction.StakingOutput.Value - int64(params.UnbondingFee)
+
+	if expectedUnbondingOutputValue <= 0 {
+		// This is actually eror of our parameters configuaration and should not happen
+		// for honest requests.
+		return nil, fmt.Errorf("staking output value is too low")
+	}
+
+	// build expected output in unbonding transaction
+	unbondingInfo, err := btcstaking.BuildUnbondingInfo(
+		parsedStakingTransaction.OpReturnData.StakerPublicKey.PubKey,
+		[]*btcec.PublicKey{parsedStakingTransaction.OpReturnData.FinalityProviderPublicKey.PubKey},
+		params.CovenantPublicKeys,
+		params.CovenantQuorum,
+		params.UnbondingTime,
+		btcutil.Amount(expectedUnbondingOutputValue),
+		s.net,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !outputsAreEqual(unbondingInfo.UnbondingOutput, unbondingTx.TxOut[0]) {
+		return nil, fmt.Errorf("unbonding output does not match expected output")
+	}
+
+	// At this point we know that:
+	// - unbonding tx has correct shape - 1 input, 1 output, no timelocks, not replaceable
+	// - staking tx exists on btc chain, is mature and has correct shape according Babylong Params
+	// - unbonding tx output matches the parameters from the staking transaction and the params
+	// We can send request to our remote signer
 
 	stakingInfo, err := btcstaking.BuildStakingInfo(
 		parsedStakingTransaction.OpReturnData.StakerPublicKey.PubKey,

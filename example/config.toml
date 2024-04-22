@@ -41,6 +41,12 @@ magic_bytes = "01020304"
 # The number of confirmations required for the staking transaction to be mature
 w = 100
 
+# Timelock in unbonding transaction
+unbonding_time = 100
+
+# Required fee for unbonding transaction
+unbonding_fee = 10000
+
 [server-config]
 # The address to listen on
 host = "127.0.0.1"

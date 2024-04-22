@@ -24,5 +24,7 @@ func (c *ConfigParamsRetriever) Params(ctx context.Context) (*BabylonParams, err
 		CovenantQuorum:     c.params.CovenantQuorum,
 		MagicBytes:         c.params.MagicBytes,
 		W:                  c.params.W,
+		UnbondingTime:      c.params.UnbondingTime,
+		UnbondingFee:       c.params.UnbondingFee,
 	}, nil
 }

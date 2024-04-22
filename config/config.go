@@ -110,6 +110,12 @@ magic_bytes = "{{ .Params.MagicBytes }}"
 # The number of confirmations required for the staking transaction to be mature
 w = {{ .Params.W }}
 
+# Timelock in unbonding transaction
+unbonding_time = {{ .Params.UnbondingTime }}
+
+# Required fee for unbonding transaction
+unbonding_fee = {{ .Params.UnbondingFee }}
+
 [server-config]
 # The address to listen on
 host = "{{ .Server.Host }}"

@@ -34,28 +34,28 @@ var (
 )
 
 type TestManager struct {
-	t                   *testing.T
-	bitcoindHandler     *BitcoindTestHandler
-	walletPass          string
-	btcClient           *btcclient.BtcClient
-	localCovenantPubKey *btcec.PublicKey
-	allCovenantKeys     []*btcec.PublicKey
-	covenantQuorum      uint32
-	finalityProviderKey *btcec.PrivateKey
-	stakerAddress       btcutil.Address
-	stakerPubKey        *btcec.PublicKey
-	magicBytes          []byte
-	signerConfig        *config.Config
-	app                 *signerapp.SignerApp
-	server              *signerservice.SigningServer
+	t                     *testing.T
+	bitcoindHandler       *BitcoindTestHandler
+	walletPass            string
+	btcClient             *btcclient.BtcClient
+	localCovenantPubKey   *btcec.PublicKey
+	allCovenantKeys       []*btcec.PublicKey
+	covenantQuorum        uint32
+	finalityProviderKey   *btcec.PrivateKey
+	stakerAddress         btcutil.Address
+	stakerPubKey          *btcec.PublicKey
+	magicBytes            []byte
+	requiredUnbondingTime uint16
+	requiredUnbondingFee  btcutil.Amount
+	signerConfig          *config.Config
+	app                   *signerapp.SignerApp
+	server                *signerservice.SigningServer
 }
 
 type stakingData struct {
 	stakingAmount  btcutil.Amount
 	stakingTime    uint16
 	stakingFeeRate btcutil.Amount
-	unbondingTime  uint16
-	unbondingFee   btcutil.Amount
 }
 
 func defaultStakingData() *stakingData {
@@ -63,13 +63,7 @@ func defaultStakingData() *stakingData {
 		stakingAmount:  btcutil.Amount(100000),
 		stakingTime:    10000,
 		stakingFeeRate: btcutil.Amount(5000), //feeRatePerKb
-		unbondingTime:  100,
-		unbondingFee:   btcutil.Amount(10000),
 	}
-}
-
-func (d *stakingData) unbondingAmount() btcutil.Amount {
-	return d.stakingAmount - d.unbondingFee
 }
 
 func StartManager(
@@ -193,20 +187,22 @@ func StartManager(
 	})
 
 	return &TestManager{
-		t:                   t,
-		bitcoindHandler:     h,
-		walletPass:          passphrase,
-		btcClient:           client,
-		localCovenantPubKey: localCovenantKey,
-		allCovenantKeys:     parsedconfig.ParamsConfig.CovenantPublicKeys,
-		covenantQuorum:      appConfig.Params.CovenantQuorum,
-		finalityProviderKey: fpKey,
-		stakerAddress:       walletAddress,
-		stakerPubKey:        stakerPubKey,
-		magicBytes:          mb,
-		signerConfig:        appConfig,
-		app:                 app,
-		server:              server,
+		t:                     t,
+		bitcoindHandler:       h,
+		walletPass:            passphrase,
+		btcClient:             client,
+		localCovenantPubKey:   localCovenantKey,
+		allCovenantKeys:       parsedconfig.ParamsConfig.CovenantPublicKeys,
+		covenantQuorum:        appConfig.Params.CovenantQuorum,
+		requiredUnbondingTime: parsedconfig.ParamsConfig.UnbondingTime,
+		requiredUnbondingFee:  parsedconfig.ParamsConfig.UnbondingFee,
+		finalityProviderKey:   fpKey,
+		stakerAddress:         walletAddress,
+		stakerPubKey:          stakerPubKey,
+		magicBytes:            mb,
+		signerConfig:          appConfig,
+		app:                   app,
+		server:                server,
 	}
 }
 
@@ -270,8 +266,8 @@ func (tm *TestManager) createUnbondingTx(
 		[]*btcec.PublicKey{tm.finalityProviderKey.PubKey()},
 		tm.covenantPubKeys(),
 		tm.covenantQuorum,
-		d.unbondingTime,
-		d.unbondingAmount(),
+		tm.requiredUnbondingTime,
+		d.stakingAmount-tm.requiredUnbondingFee,
 		netParams,
 	)
 	require.NoError(tm.t, err)
