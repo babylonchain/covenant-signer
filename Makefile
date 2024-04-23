@@ -1,7 +1,7 @@
 DOCKER = $(shell which docker)
 BUILDDIR ?= $(CURDIR)/build
 
-PACKAGES_E2E=$(shell go list ./... | grep '/itest')
+PACKAGES_E2E=$(shell go list ./... | grep '/suite')
 
 ldflags := $(LDFLAGS)
 build_tags := $(BUILD_TAGS)

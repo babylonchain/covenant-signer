@@ -319,6 +319,9 @@ func (w *BtcClient) SignPsbt(packet *psbt.Packet) (*psbt.Packet, error) {
 		return nil, err
 	}
 
+	fmt.Println("************* PSBT TO SIGN *************")
+	fmt.Println(psbtEncoded)
+
 	sign := true
 	deriv := false
 	result, err := w.RpcClient.WalletProcessPsbt(
@@ -332,6 +335,9 @@ func (w *BtcClient) SignPsbt(packet *psbt.Packet) (*psbt.Packet, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("************* SIGNED PSBT *************")
+	fmt.Println(result.Psbt)
 
 	decodedBytes, err := base64.StdEncoding.DecodeString(result.Psbt)
 

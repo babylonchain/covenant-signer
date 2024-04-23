@@ -1,11 +1,14 @@
 //go:build e2e
 // +build e2e
 
-package e2etest
+package suite
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -108,16 +111,20 @@ func (d *stakingData) unbondingAmount() btcutil.Amount {
 	return d.stakingAmount - d.unbondingFee
 }
 
-func getNewPubKeyInWallet(t *testing.T, c *btcclient.BtcClient, name string) *btcec.PublicKey {
+func getNewPubKeyInWallet(t *testing.T, c *btcclient.BtcClient, name string) (*btcec.PublicKey, btcutil.Address, uint32) {
 	addr, err := c.RpcClient.GetNewAddress(name)
 	require.NoError(t, err)
 	info, err := c.RpcClient.GetAddressInfo(addr.EncodeAddress())
 	require.NoError(t, err)
+	fmt.Println("address descriptor")
+	fmt.Println(*info.Descriptor)
+	fmt.Println("master finger")
+	fmt.Println(*info.HDMasterFingerprint)
 	pubKeyBytes, err := hex.DecodeString(*info.PubKey)
 	require.NoError(t, err)
 	pubKey, err := btcec.ParsePubKey(pubKeyBytes)
 	require.NoError(t, err)
-	return pubKey
+	return pubKey, addr, keyFingerPrint(t, *info.HDMasterFingerprint)
 }
 
 func StartManager(
@@ -421,6 +428,46 @@ func ImportDescriptors(c *btcclient.BtcClient, descriptor string) ([]byte, error
 	return c.RpcClient.RawRequest("importdescriptors", []json.RawMessage{bytes})
 }
 
+func buildPathsInfo(t *testing.T, s *btcstaking.StakingInfo) (*btcstaking.SpendInfo, *btcstaking.SpendInfo, *btcstaking.SpendInfo) {
+	stakingPathInfo, err := s.TimeLockPathSpendInfo()
+	require.NoError(t, err)
+	unbondingPathInfo, err := s.UnbondingPathSpendInfo()
+	require.NoError(t, err)
+	slashingPathInfo, err := s.SlashingPathSpendInfo()
+	require.NoError(t, err)
+	return stakingPathInfo, unbondingPathInfo, slashingPathInfo
+}
+
+func builldFakeStakingTx(t *testing.T, s *btcstaking.StakingInfo) *wire.MsgTx {
+	stakingTransaction := wire.NewMsgTx(2)
+	fakeHashBytes := sha256.Sum256([]byte{1})
+	fakeHash, err := chainhash.NewHash(fakeHashBytes[:])
+	require.NoError(t, err)
+
+	fakeInput := wire.NewOutPoint(fakeHash, 0)
+	stakingTransaction.AddTxIn(wire.NewTxIn(fakeInput, nil, nil))
+	stakingTransaction.AddTxOut(s.StakingOutput)
+	return stakingTransaction
+}
+
+func mustGetControlBlockBytes(t *testing.T, s *btcstaking.SpendInfo) []byte {
+	controlBlockBytes, err := s.ControlBlock.ToBytes()
+	require.NoError(t, err)
+	return controlBlockBytes
+}
+
+func mustGetLeafHash(t *testing.T, s *btcstaking.SpendInfo) []byte {
+	tap := s.RevealedLeaf.TapHash()
+	return tap.CloneBytes()
+}
+
+func keyFingerPrint(t *testing.T, stringBytes string) uint32 {
+	decoded, err := hex.DecodeString(stringBytes)
+	require.NoError(t, err)
+
+	return binary.LittleEndian.Uint32(decoded)
+}
+
 func TestDebugPsbtSigning(t *testing.T) {
 	// Setup bitcoind
 	m, err := containers.NewManager()
@@ -436,6 +483,8 @@ func TestDebugPsbtSigning(t *testing.T) {
 	passphrase := "pass"
 	_ = h.CreateWallet("test-wallet", passphrase)
 	_ = h.GenerateBlocks(int(100) + 100)
+
+	// _ = h.CreateWallet("covenant-wallet", "foo")
 
 	// prepare all staking  parameters outside of covenant wallet
 	// ***************************************
@@ -474,7 +523,11 @@ func TestDebugPsbtSigning(t *testing.T) {
 	err = client.UnlockWallet(60*60*60, passphrase)
 	require.NoError(t, err)
 
-	localCovenantMemberPubKey := getNewPubKeyInWallet(t, client, "covenant")
+	localCovenantMemberPubKey, localCovenantAddress, fingerPrint := getNewPubKeyInWallet(t, client, "covenant")
+	covPkScript, err := txscript.PayToAddrScript(localCovenantAddress)
+	require.NoError(t, err)
+	require.NotNil(t, covPkScript)
+	require.NotNil(t, &fingerPrint)
 
 	covenantKeys := []*btcec.PublicKey{
 		localCovenantMemberPubKey,
@@ -495,42 +548,9 @@ func TestDebugPsbtSigning(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, stakingInfo)
 
-	stakingTransaction := wire.NewMsgTx(2)
-	fakeHashBytes := sha256.Sum256([]byte{1})
-	fakeHash, err := chainhash.NewHash(fakeHashBytes[:])
-	require.NoError(t, err)
-
-	fakeInput := wire.NewOutPoint(fakeHash, 0)
-	stakingTransaction.AddTxIn(wire.NewTxIn(fakeInput, nil, nil))
-	stakingTransaction.AddTxOut(stakingInfo.StakingOutput)
+	stakingTransaction := builldFakeStakingTx(t, stakingInfo)
 	stakingTxHash := stakingTransaction.TxHash()
-
-	stakingPathInfo, err := stakingInfo.TimeLockPathSpendInfo()
-	require.NoError(t, err)
-	require.NotNil(t, stakingPathInfo)
-	stakingPathControlBytes, err := stakingPathInfo.ControlBlock.ToBytes()
-	require.NoError(t, err)
-	require.NotNil(t, stakingPathControlBytes)
-	stakingPathLeafHash := stakingPathInfo.RevealedLeaf.TapHash()
-	require.NotNil(t, &stakingPathLeafHash)
-
-	unbondingPathInfo, err := stakingInfo.UnbondingPathSpendInfo()
-	require.NoError(t, err)
-	unbondingPathCtrlBlockBytes, err := unbondingPathInfo.ControlBlock.ToBytes()
-	require.NoError(t, err)
-	require.NotNil(t, unbondingPathCtrlBlockBytes)
-	unbondingPathLeafHash := unbondingPathInfo.RevealedLeaf.TapHash()
-	require.NotNil(t, &unbondingPathLeafHash)
-
-	slashingPathInfo, err := stakingInfo.SlashingPathSpendInfo()
-	require.NoError(t, err)
-	require.NotNil(t, slashingPathInfo)
-	slashingPathLeafHash := slashingPathInfo.RevealedLeaf.TapHash()
-	slashingPathControlBytes, err := slashingPathInfo.ControlBlock.ToBytes()
-	require.NoError(t, err)
-	require.NotNil(t, slashingPathControlBytes)
-	require.NotNil(t, &slashingPathLeafHash)
-
+	stakingPathInfo, unbondingPathInfo, slashingPathInfo := buildPathsInfo(t, stakingInfo)
 	tree := txscript.AssembleTaprootScriptTree(
 		stakingPathInfo.RevealedLeaf,
 		unbondingPathInfo.RevealedLeaf,
@@ -538,6 +558,7 @@ func TestDebugPsbtSigning(t *testing.T) {
 	)
 	require.NotNil(t, tree)
 	treeRootNode := tree.RootNode.TapHash()
+
 	// client.RpcClient.GetDescriptorInfo()
 	unbondingInfo, err := btcstaking.BuildUnbondingInfo(
 		stakerKey.PubKey(),
@@ -551,31 +572,12 @@ func TestDebugPsbtSigning(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, unbondingInfo)
 
-	rawUnbondingTx := wire.NewMsgTx(2)
-	rawUnbondingTx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(&stakingTxHash, 0), nil, nil))
-	rawUnbondingTx.AddTxOut(unbondingInfo.UnbondingOutput)
+	paytToCovenantOutpout := wire.NewTxOut(int64(stakingAmount-2000), covPkScript)
+	require.NotNil(t, paytToCovenantOutpout)
 
-	internalKey := unspendableKeyPathInternalPubKey()
-	taprootOutputKey := txscript.ComputeTaprootOutputKey(
-		&internalKey, treeRootNode.CloneBytes(),
-	)
-
-	descriptor := fmt.Sprintf("rawtr(%s)", hex.EncodeToString(schnorr.SerializePubKey(taprootOutputKey)))
-
-	resp, err := client.RpcClient.GetDescriptorInfo(descriptor)
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	fmt.Println("Got descriptor")
-	fmt.Println(resp)
-
-	res, err := ImportDescriptors(client, descriptor)
-	require.NoError(t, err)
-	require.NotNil(t, res)
-
-	// build unbonding transactions via psbt packet
 	psbtPacket, err := psbt.New(
 		[]*wire.OutPoint{wire.NewOutPoint(&stakingTxHash, 0)},
-		[]*wire.TxOut{unbondingInfo.UnbondingOutput},
+		[]*wire.TxOut{paytToCovenantOutpout},
 		2,
 		0,
 		[]uint32{0},
@@ -588,24 +590,58 @@ func TestDebugPsbtSigning(t *testing.T) {
 	psbtPacket.Inputs[0].WitnessUtxo = stakingInfo.StakingOutput
 	psbtPacket.Inputs[0].WitnessScript = unbondingPathInfo.RevealedLeaf.Script
 	psbtPacket.Inputs[0].TaprootBip32Derivation = []*psbt.TaprootBip32Derivation{
+		// {
+		// 	XOnlyPubKey: schnorr.SerializePubKey(stakerKey.PubKey()),
+		// 	LeafHashes: [][]byte{
+		// 		mustGetLeafHash(t, unbondingPathInfo),
+		// 		// mustGetLeafHash(t, slashingPathInfo),
+		// 	},
+		// },
 		{
 			XOnlyPubKey: schnorr.SerializePubKey(localCovenantMemberPubKey),
+			// LeafHashes: [][]byte{
+			// 	mustGetLeafHash(t, unbondingPathInfo),
+			// 	mustGetLeafHash(t, slashingPathInfo),
+			// },
+			// MasterKeyFingerprint: fingerPrint,
 		},
+		// {
+		// 	XOnlyPubKey: schnorr.SerializePubKey(remoteCovenantKey.PubKey()),
+		// 	LeafHashes: [][]byte{
+		// 		mustGetLeafHash(t, unbondingPathInfo),
+		// 		// slashingPathLeafHash.CloneBytes(),
+		// 	},
+		// },
 	}
 	psbtPacket.Inputs[0].TaprootLeafScript = []*psbt.TaprootTapLeafScript{
+		// {
+		// 	ControlBlock: mustGetControlBlockBytes(t, stakingPathInfo),
+		// 	Script:       stakingPathInfo.RevealedLeaf.Script,
+		// 	LeafVersion:  stakingPathInfo.RevealedLeaf.LeafVersion,
+		// },
 		{
-			ControlBlock: unbondingPathCtrlBlockBytes,
+			ControlBlock: mustGetControlBlockBytes(t, unbondingPathInfo),
 			Script:       unbondingPathInfo.RevealedLeaf.Script,
 			LeafVersion:  unbondingPathInfo.RevealedLeaf.LeafVersion,
 		},
+		// {
+		// 	ControlBlock: mustGetControlBlockBytes(t, slashingPathInfo),
+		// 	Script:       slashingPathInfo.RevealedLeaf.Script,
+		// 	LeafVersion:  slashingPathInfo.RevealedLeaf.LeafVersion,
+		// },
 	}
 
 	psbtPacket.Inputs[0].TaprootMerkleRoot = treeRootNode.CloneBytes()
 	psbtPacket.Inputs[0].TaprootInternalKey = schnorr.SerializePubKey(unbondingPathInfo.ControlBlock.InternalKey)
 
+	fmt.Println("Internal key ")
+	fmt.Println(hex.EncodeToString(schnorr.SerializePubKey(unbondingPathInfo.ControlBlock.InternalKey)))
+
 	signedPacket, err := client.SignPsbt(psbtPacket)
 	require.NoError(t, err)
 	require.NotNil(t, signedPacket)
+
+	time.Sleep(1 * time.Minute)
 
 	schnorrSigs := signedPacket.Inputs[0].TaprootScriptSpendSig
 	require.Len(t, schnorrSigs, 1)
@@ -622,4 +658,30 @@ func TestDebugPsbtSigning(t *testing.T) {
 		covenantMemberSchnorrSig.Serialize(),
 	)
 	require.NoError(t, err)
+
+}
+
+func ATestXxx(t *testing.T) {
+
+	beforeUpdate := "cHNidP8BAF4CAAAAAVCHLYClfaFZONfY81p810Fq670T2UEcdAFozpOXQWFEAAAAAAAAAAAAAdB+AQAAAAAAIlEgJa/utiRq8XLgrdrlIE6hzZI+lh9eCiqA1ttPV6/zCXUAAAAAAAEBK6CGAQAAAAAAIlEgM72Vu1Q7KGYK7WhA6Pn8F0GUkC+nBknrJfVPdmYkxQYBBWggfsNxrE4elsMH2sRywe8w2FWMGOdcS+RoQiRXiyQkUpCtILKRFvK4WLYezDuOWdO3Tme+xOoTtLuvDdW1oPfnYegCrCDd3hLg3uXWLP8iz3NXXPyQ6zKHpHU/QbdB+oooFc1GE7pRokIVwVCSm3TBoElUt4tLYDXpel4HiloPKOyW1Ue/7prOgDrAJU48K6Wfhd4f4bdaHO4WbUzXjmf6rNlfNAFMMo2PFbuLIH7DcaxOHpbDB9rEcsHvMNhVjBjnXEvkaEIkV4skJFKQrSBNtoTuxA0lzJ/LoiGBv7oAs0rvoflQZqJQM69wWi/E9a0gspEW8rhYth7MO45Z07dOZ77E6hO0u68N1bWg9+dh6AKsIN3eEuDe5dYs/yLPc1dc/JDrMoekdT9Bt0H6iigVzUYTulGiwGIVwVCSm3TBoElUt4tLYDXpel4HiloPKOyW1Ue/7prOgDrA6fqTS/GAC8LQvsLBVc2ioSEzf98QVvAtiEdZRGOmcu24qTE/cSEV0lpCaNjctdluqU260C5mOkXSo5ZvCZhEHWkgfsNxrE4elsMH2sRywe8w2FWMGOdcS+RoQiRXiyQkUpCtILKRFvK4WLYezDuOWdO3Tme+xOoTtLuvDdW1oPfnYegCrCDd3hLg3uXWLP8iz3NXXPyQ6zKHpHU/QbdB+oooFc1GE7pRosBiFcFQkpt0waBJVLeLS2A16XpeB4paDyjsltVHv+6azoA6wO2w7wQqYl2pn5P/4WvnAh8AazRfKyAiguKj7XjAx9VsuKkxP3EhFdJaQmjY3LXZbqlNutAuZjpF0qOWbwmYRB0nIH7DcaxOHpbDB9rEcsHvMNhVjBjnXEvkaEIkV4skJFKQrQIQJ7LAIRaykRbyuFi2Hsw7jlnTt05nvsTqE7S7rw3VtaD352HoAkUC7bDvBCpiXamfk//ha+cCHwBrNF8rICKC4qPteMDH1Wy4qTE/cSEV0lpCaNjctdluqU260C5mOkXSo5ZvCZhEHQAAAAAhFt3eEuDe5dYs/yLPc1dc/JDrMoekdT9Bt0H6iigVzUYTRQLtsO8EKmJdqZ+T/+Fr5wIfAGs0XysgIoLio+14wMfVbLipMT9xIRXSWkJo2Ny12W6pTbrQLmY6RdKjlm8JmEQdAAAAAAEXIFCSm3TBoElUt4tLYDXpel4HiloPKOyW1Ue/7prOgDrAARggXSYTWW1VliT3Egk3gHfxxF2uctZNNgpcWWK1h80buL8AAA=="
+	afterUpdate := "cHNidP8BAF4CAAAAAVCHLYClfaFZONfY81p810Fq670T2UEcdAFozpOXQWFEAAAAAAAAAAAAAdB+AQAAAAAAIlEgJa/utiRq8XLgrdrlIE6hzZI+lh9eCiqA1ttPV6/zCXUAAAAAAAEBK6CGAQAAAAAAIlEgM72Vu1Q7KGYK7WhA6Pn8F0GUkC+nBknrJfVPdmYkxQYBBWggfsNxrE4elsMH2sRywe8w2FWMGOdcS+RoQiRXiyQkUpCtILKRFvK4WLYezDuOWdO3Tme+xOoTtLuvDdW1oPfnYegCrCDd3hLg3uXWLP8iz3NXXPyQ6zKHpHU/QbdB+oooFc1GE7pRomIVwVCSm3TBoElUt4tLYDXpel4HiloPKOyW1Ue/7prOgDrA7bDvBCpiXamfk//ha+cCHwBrNF8rICKC4qPteMDH1Wy4qTE/cSEV0lpCaNjctdluqU260C5mOkXSo5ZvCZhEHScgfsNxrE4elsMH2sRywe8w2FWMGOdcS+RoQiRXiyQkUpCtAhAnssBCFcFQkpt0waBJVLeLS2A16XpeB4paDyjsltVHv+6azoA6wCVOPCuln4XeH+G3WhzuFm1M145n+qzZXzQBTDKNjxW7iyB+w3GsTh6WwwfaxHLB7zDYVYwY51xL5GhCJFeLJCRSkK0gTbaE7sQNJcyfy6Ihgb+6ALNK76H5UGaiUDOvcFovxPWtILKRFvK4WLYezDuOWdO3Tme+xOoTtLuvDdW1oPfnYegCrCDd3hLg3uXWLP8iz3NXXPyQ6zKHpHU/QbdB+oooFc1GE7pRosBiFcFQkpt0waBJVLeLS2A16XpeB4paDyjsltVHv+6azoA6wOn6k0vxgAvC0L7CwVXNoqEhM3/fEFbwLYhHWURjpnLtuKkxP3EhFdJaQmjY3LXZbqlNutAuZjpF0qOWbwmYRB1pIH7DcaxOHpbDB9rEcsHvMNhVjBjnXEvkaEIkV4skJFKQrSCykRbyuFi2Hsw7jlnTt05nvsTqE7S7rw3VtaD352HoAqwg3d4S4N7l1iz/Is9zV1z8kOsyh6R1P0G3QfqKKBXNRhO6UaLAIRaykRbyuFi2Hsw7jlnTt05nvsTqE7S7rw3VtaD352HoAkUCuKkxP3EhFdJaQmjY3LXZbqlNutAuZjpF0qOWbwmYRB3tsO8EKmJdqZ+T/+Fr5wIfAGs0XysgIoLio+14wMfVbAAAAAAhFt3eEuDe5dYs/yLPc1dc/JDrMoekdT9Bt0H6iigVzUYTRQK4qTE/cSEV0lpCaNjctdluqU260C5mOkXSo5ZvCZhEHe2w7wQqYl2pn5P/4WvnAh8AazRfKyAiguKj7XjAx9VsAAAAAAEXIFCSm3TBoElUt4tLYDXpel4HiloPKOyW1Ue/7prOgDrAARggXSYTWW1VliT3Egk3gHfxxF2uctZNNgpcWWK1h80buL8AAA=="
+
+	decodedBytes, err := base64.StdEncoding.DecodeString(afterUpdate)
+	require.NoError(t, err)
+
+	decoded, err := psbt.NewFromRawBytes(bytes.NewReader(decodedBytes), false)
+	require.NoError(t, err)
+
+	decBytesBeforeUpdate, err := base64.StdEncoding.DecodeString(beforeUpdate)
+	require.NoError(t, err)
+
+	decodedBeforeUpdate, err := psbt.NewFromRawBytes(bytes.NewReader(decBytesBeforeUpdate), false)
+	require.NoError(t, err)
+
+	fmt.Println("****************** Before update ******************")
+	fmt.Println(decodedBeforeUpdate.Inputs[0])
+
+	fmt.Println("****************** After update ******************")
+	fmt.Println(decoded.Inputs[0])
+
 }
