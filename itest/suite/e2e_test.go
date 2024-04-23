@@ -513,6 +513,8 @@ func assembleMultiSigScript(
 	}
 
 	builder.AddInt64(int64(threshold))
+	// for some reason OP_GREATERTHANOREQUAL is not working for signig multisigs
+	// builder.AddOp(txscript.OP_GREATERTHANOREQUAL)
 	builder.AddOp(txscript.OP_NUMEQUAL)
 	if withVerify {
 		builder.AddOp(txscript.OP_VERIFY)
