@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -438,7 +439,7 @@ func buildPathsInfo(t *testing.T, s *btcstaking.StakingInfo) (*btcstaking.SpendI
 	return stakingPathInfo, unbondingPathInfo, slashingPathInfo
 }
 
-func builldFakeStakingTx(t *testing.T, s *btcstaking.StakingInfo) *wire.MsgTx {
+func builldFakeStakingTx(t *testing.T, s *wire.TxOut) *wire.MsgTx {
 	stakingTransaction := wire.NewMsgTx(2)
 	fakeHashBytes := sha256.Sum256([]byte{1})
 	fakeHash, err := chainhash.NewHash(fakeHashBytes[:])
@@ -446,7 +447,7 @@ func builldFakeStakingTx(t *testing.T, s *btcstaking.StakingInfo) *wire.MsgTx {
 
 	fakeInput := wire.NewOutPoint(fakeHash, 0)
 	stakingTransaction.AddTxIn(wire.NewTxIn(fakeInput, nil, nil))
-	stakingTransaction.AddTxOut(s.StakingOutput)
+	stakingTransaction.AddTxOut(s)
 	return stakingTransaction
 }
 
@@ -468,7 +469,102 @@ func keyFingerPrint(t *testing.T, stringBytes string) uint32 {
 	return binary.LittleEndian.Uint32(decoded)
 }
 
-func TestDebugPsbtSigning(t *testing.T) {
+func sortKeys(keys []*btcec.PublicKey) []*btcec.PublicKey {
+	sortedKeys := make([]*btcec.PublicKey, len(keys))
+	copy(sortedKeys, keys)
+	sort.SliceStable(sortedKeys, func(i, j int) bool {
+		keyIBytes := schnorr.SerializePubKey(sortedKeys[i])
+		keyJBytes := schnorr.SerializePubKey(sortedKeys[j])
+		return bytes.Compare(keyIBytes, keyJBytes) == -1
+	})
+	return sortedKeys
+}
+
+func prepareKeysForMultisigScript(keys []*btcec.PublicKey) ([]*btcec.PublicKey, error) {
+	if len(keys) < 2 {
+		return nil, fmt.Errorf("cannot create multisig script with less than 2 keys")
+	}
+
+	sortedKeys := sortKeys(keys)
+
+	for i := 0; i < len(sortedKeys)-1; i++ {
+		if bytes.Equal(schnorr.SerializePubKey(sortedKeys[i]), schnorr.SerializePubKey(sortedKeys[i+1])) {
+			return nil, fmt.Errorf("duplicate key in list of keys")
+		}
+	}
+
+	return sortedKeys, nil
+}
+
+func assembleMultiSigScript(
+	pubkeys []*btcec.PublicKey,
+	threshold uint32,
+	withVerify bool,
+) ([]byte, error) {
+	builder := txscript.NewScriptBuilder()
+
+	for i, key := range pubkeys {
+		builder.AddData(schnorr.SerializePubKey(key))
+		if i == 0 {
+			builder.AddOp(txscript.OP_CHECKSIG)
+		} else {
+			builder.AddOp(txscript.OP_CHECKSIGADD)
+		}
+	}
+
+	builder.AddInt64(int64(threshold))
+	builder.AddOp(txscript.OP_NUMEQUAL)
+	if withVerify {
+		builder.AddOp(txscript.OP_VERIFY)
+	}
+
+	return builder.Script()
+}
+
+func buildSingleKeySigScript(
+	pubKey *btcec.PublicKey,
+	withVerify bool,
+) ([]byte, error) {
+	builder := txscript.NewScriptBuilder()
+	builder.AddData(schnorr.SerializePubKey(pubKey))
+
+	if withVerify {
+		builder.AddOp(txscript.OP_CHECKSIGVERIFY)
+	} else {
+		builder.AddOp(txscript.OP_CHECKSIG)
+	}
+
+	return builder.Script()
+}
+
+func buildMultiSigScript(
+	keys []*btcec.PublicKey,
+	threshold uint32,
+	withVerify bool,
+) ([]byte, error) {
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("no keys provided")
+	}
+
+	if threshold > uint32(len(keys)) {
+		return nil, fmt.Errorf("required number of valid signers is greater than number of provided keys")
+	}
+
+	if len(keys) == 1 {
+		// if we have only one key we can use single key sig script
+		return buildSingleKeySigScript(keys[0], withVerify)
+	}
+
+	sortedKeys, err := prepareKeysForMultisigScript(keys)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return assembleMultiSigScript(sortedKeys, threshold, withVerify)
+}
+
+func ATestDebugPsbtSigning(t *testing.T) {
 	// Setup bitcoind
 	m, err := containers.NewManager()
 	require.NoError(t, err)
@@ -548,7 +644,7 @@ func TestDebugPsbtSigning(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, stakingInfo)
 
-	stakingTransaction := builldFakeStakingTx(t, stakingInfo)
+	stakingTransaction := builldFakeStakingTx(t, stakingInfo.StakingOutput)
 	stakingTxHash := stakingTransaction.TxHash()
 	stakingPathInfo, unbondingPathInfo, slashingPathInfo := buildPathsInfo(t, stakingInfo)
 	tree := txscript.AssembleTaprootScriptTree(
@@ -589,46 +685,23 @@ func TestDebugPsbtSigning(t *testing.T) {
 	psbtPacket.Inputs[0].SighashType = txscript.SigHashDefault
 	psbtPacket.Inputs[0].WitnessUtxo = stakingInfo.StakingOutput
 	psbtPacket.Inputs[0].WitnessScript = unbondingPathInfo.RevealedLeaf.Script
+	psbtPacket.Inputs[0].Bip32Derivation = []*psbt.Bip32Derivation{
+		{
+			PubKey: localCovenantMemberPubKey.SerializeCompressed(),
+		},
+	}
 	psbtPacket.Inputs[0].TaprootBip32Derivation = []*psbt.TaprootBip32Derivation{
-		// {
-		// 	XOnlyPubKey: schnorr.SerializePubKey(stakerKey.PubKey()),
-		// 	LeafHashes: [][]byte{
-		// 		mustGetLeafHash(t, unbondingPathInfo),
-		// 		// mustGetLeafHash(t, slashingPathInfo),
-		// 	},
-		// },
 		{
 			XOnlyPubKey: schnorr.SerializePubKey(localCovenantMemberPubKey),
-			// LeafHashes: [][]byte{
-			// 	mustGetLeafHash(t, unbondingPathInfo),
-			// 	mustGetLeafHash(t, slashingPathInfo),
-			// },
-			// MasterKeyFingerprint: fingerPrint,
 		},
-		// {
-		// 	XOnlyPubKey: schnorr.SerializePubKey(remoteCovenantKey.PubKey()),
-		// 	LeafHashes: [][]byte{
-		// 		mustGetLeafHash(t, unbondingPathInfo),
-		// 		// slashingPathLeafHash.CloneBytes(),
-		// 	},
-		// },
 	}
 	psbtPacket.Inputs[0].TaprootLeafScript = []*psbt.TaprootTapLeafScript{
-		// {
-		// 	ControlBlock: mustGetControlBlockBytes(t, stakingPathInfo),
-		// 	Script:       stakingPathInfo.RevealedLeaf.Script,
-		// 	LeafVersion:  stakingPathInfo.RevealedLeaf.LeafVersion,
-		// },
+
 		{
 			ControlBlock: mustGetControlBlockBytes(t, unbondingPathInfo),
 			Script:       unbondingPathInfo.RevealedLeaf.Script,
 			LeafVersion:  unbondingPathInfo.RevealedLeaf.LeafVersion,
 		},
-		// {
-		// 	ControlBlock: mustGetControlBlockBytes(t, slashingPathInfo),
-		// 	Script:       slashingPathInfo.RevealedLeaf.Script,
-		// 	LeafVersion:  slashingPathInfo.RevealedLeaf.LeafVersion,
-		// },
 	}
 
 	psbtPacket.Inputs[0].TaprootMerkleRoot = treeRootNode.CloneBytes()
@@ -641,7 +714,7 @@ func TestDebugPsbtSigning(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, signedPacket)
 
-	time.Sleep(1 * time.Minute)
+	// time.Sleep(1 * time.Minute)
 
 	schnorrSigs := signedPacket.Inputs[0].TaprootScriptSpendSig
 	require.Len(t, schnorrSigs, 1)
@@ -684,4 +757,148 @@ func ATestXxx(t *testing.T) {
 	fmt.Println("****************** After update ******************")
 	fmt.Println(decoded.Inputs[0])
 
+}
+
+func TestDebugPsbtSigningNoStaking(t *testing.T) {
+	// Setup bitcoind
+	m, err := containers.NewManager()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = m.ClearResources()
+	})
+
+	h := NewBitcoindHandler(t, m)
+	h.Start()
+
+	// Setup Wallet
+	passphrase := "pass"
+	_ = h.CreateWallet("test-wallet", passphrase)
+	_ = h.GenerateBlocks(int(100) + 100)
+
+	appConfig := config.DefaultConfig()
+	appConfig.BtcNodeConfig.Host = "127.0.0.1:18443"
+	appConfig.BtcNodeConfig.User = "user"
+	appConfig.BtcNodeConfig.Pass = "pass"
+	appConfig.BtcNodeConfig.Network = netParams.Name
+
+	fakeParsedConfig, err := appConfig.Parse()
+	require.NoError(t, err)
+	// Client for testing purposes
+	client, err := btcclient.NewBtcClient(fakeParsedConfig.BtcNodeConfig)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	// Unlock wallet for whole tests
+	err = client.UnlockWallet(60*60*60, passphrase)
+	require.NoError(t, err)
+
+	localCovenantMemberPubKey, localCovenantAddress, fingerPrint := getNewPubKeyInWallet(t, client, "covenant")
+	covPkScript, err := txscript.PayToAddrScript(localCovenantAddress)
+	require.NoError(t, err)
+	require.NotNil(t, localCovenantMemberPubKey)
+	require.NotNil(t, covPkScript)
+	require.NotNil(t, &fingerPrint)
+
+	remoteCovenantKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	require.NotNil(t, remoteCovenantKey)
+
+	remoteCovenantKey1, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	require.NotNil(t, remoteCovenantKey1)
+
+	allKeysInScript := []*btcec.PublicKey{
+		localCovenantMemberPubKey,
+		remoteCovenantKey.PubKey(),
+		remoteCovenantKey1.PubKey(),
+	}
+
+	stakerKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	require.NotNil(t, stakerKey)
+
+	singleKeyScript, err := buildSingleKeySigScript(stakerKey.PubKey(), true)
+	require.NoError(t, err)
+	require.NotNil(t, singleKeyScript)
+
+	multiSigScript, err := buildMultiSigScript(
+		allKeysInScript,
+		2,
+		false,
+	)
+
+	var finalScript []byte
+	finalScript = append(finalScript, singleKeyScript...)
+	finalScript = append(finalScript, multiSigScript...)
+
+	baseLeaf := txscript.NewBaseTapLeaf(finalScript)
+	tree := txscript.AssembleTaprootScriptTree(baseLeaf)
+	require.NotNil(t, tree)
+	treeRootNode := tree.RootNode.TapHash()
+	require.NotNil(t, &treeRootNode)
+	leafInfo := tree.LeafMerkleProofs[0]
+	controlBlock := leafInfo.ToControlBlock(&unspendableKeyPathKey)
+	controlBlockBytes, err := controlBlock.ToBytes()
+	require.NoError(t, err)
+	require.NotNil(t, controlBlockBytes)
+
+	taprootPkScript, err := btcstaking.DeriveTaprootPkScript(
+		tree,
+		&unspendableKeyPathKey,
+		netParams,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, taprootPkScript)
+
+	fundingTxValue := int64(100000)
+	fundingTx := builldFakeStakingTx(t, wire.NewTxOut(fundingTxValue, taprootPkScript))
+	fundingTxHash := fundingTx.TxHash()
+
+	paytToCovenantOutpout := wire.NewTxOut(fundingTxValue-2000, covPkScript)
+	require.NotNil(t, paytToCovenantOutpout)
+
+	psbtPacket, err := psbt.New(
+		[]*wire.OutPoint{wire.NewOutPoint(&fundingTxHash, 0)},
+		[]*wire.TxOut{paytToCovenantOutpout},
+		2,
+		0,
+		[]uint32{0},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, psbtPacket)
+
+	psbtPacket.Inputs[0].SighashType = txscript.SigHashDefault
+	psbtPacket.Inputs[0].WitnessUtxo = fundingTx.TxOut[0]
+	psbtPacket.Inputs[0].WitnessScript = leafInfo.Script
+	psbtPacket.Inputs[0].TaprootBip32Derivation = []*psbt.TaprootBip32Derivation{
+		{
+			XOnlyPubKey: schnorr.SerializePubKey(localCovenantMemberPubKey),
+		},
+		// {
+		// 	XOnlyPubKey: schnorr.SerializePubKey(remoteCovenantKey.PubKey()),
+		// },
+	}
+	psbtPacket.Inputs[0].TaprootLeafScript = []*psbt.TaprootTapLeafScript{
+
+		{
+			ControlBlock: controlBlockBytes,
+			Script:       leafInfo.Script,
+			LeafVersion:  leafInfo.LeafVersion,
+		},
+	}
+	psbtPacket.Inputs[0].TaprootInternalKey = schnorr.SerializePubKey(&unspendableKeyPathKey)
+	psbtPacket.Inputs[0].TaprootMerkleRoot = treeRootNode.CloneBytes()
+
+	signedPacket, err := client.SignPsbt(psbtPacket)
+	require.NoError(t, err)
+	require.NotNil(t, signedPacket)
+
+	// time.Sleep(1 * time.Minute)
+
+	schnorrSigs := signedPacket.Inputs[0].TaprootScriptSpendSig
+	require.Len(t, schnorrSigs, 1)
+
+	covenantMemberSchnorrSig, err := schnorr.ParseSignature(schnorrSigs[0].Signature)
+	require.NoError(t, err)
+	require.NotNil(t, covenantMemberSchnorrSig)
 }
