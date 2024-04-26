@@ -155,7 +155,7 @@ func StartManager(
 
 	// In e2e test we are using the same node for signing as for indexing funcitonalities
 	chainInfo := signerapp.NewBitcoindChainInfo(client)
-	signer := signerapp.NewPrivKeySigner(client)
+	signer := signerapp.NewPsbtSigner(client)
 	paramsGetter := signerapp.NewConfigParamsRetriever(parsedconfig.ParamsConfig)
 
 	app := signerapp.NewSignerApp(

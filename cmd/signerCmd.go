@@ -48,7 +48,7 @@ var runSignerCmd = &cobra.Command{
 		}
 
 		// TODO: Add options to use customn remote signers
-		signer := signerapp.NewPrivKeySigner(signerClient)
+		signer := signerapp.NewPsbtSigner(signerClient)
 
 		paramsGetter := signerapp.NewConfigParamsRetriever(parsedConfig.ParamsConfig)
 
