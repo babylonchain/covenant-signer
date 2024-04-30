@@ -61,7 +61,6 @@ func btcConfigToConnConfig(cfg *config.ParsedBtcConfig) *rpcclient.ConnConfig {
 		DisableConnectOnNew:  true,
 		DisableAutoReconnect: false,
 		HTTPPostMode:         true,
-		Params:               cfg.Network.Name,
 	}
 }
 
