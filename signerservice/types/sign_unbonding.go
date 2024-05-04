@@ -1,4 +1,4 @@
-package signerservice
+package types
 
 // SignUnbondingTxPayload carries all data necessary to sign unbonding transaction
 type SignUnbondingTxRequest struct {

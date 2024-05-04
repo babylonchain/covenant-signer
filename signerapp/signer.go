@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log/slog"
-
 	"github.com/babylonchain/babylon/btcstaking"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -64,26 +62,23 @@ type BabylonParamsRetriever interface {
 }
 
 type SignerApp struct {
-	logger *slog.Logger
-	s      ExternalBtcSigner
-	r      BtcChainInfo
-	p      BabylonParamsRetriever
-	net    *chaincfg.Params
+	s   ExternalBtcSigner
+	r   BtcChainInfo
+	p   BabylonParamsRetriever
+	net *chaincfg.Params
 }
 
 func NewSignerApp(
-	log *slog.Logger,
 	s ExternalBtcSigner,
 	r BtcChainInfo,
 	p BabylonParamsRetriever,
 	net *chaincfg.Params,
 ) *SignerApp {
 	return &SignerApp{
-		logger: log,
-		s:      s,
-		r:      r,
-		p:      p,
-		net:    net,
+		s:   s,
+		r:   r,
+		p:   p,
+		net: net,
 	}
 }
 

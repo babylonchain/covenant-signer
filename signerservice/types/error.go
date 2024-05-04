@@ -1,4 +1,4 @@
-package signerservice
+package types
 
 import (
 	"errors"

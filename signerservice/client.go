@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/babylonchain/covenant-signer/signerservice/handlers"
+	"github.com/babylonchain/covenant-signer/signerservice/types"
 	"io"
 	"net/http"
 	"time"
@@ -34,7 +36,7 @@ func RequestCovenantSignaure(
 
 	pkScriptHex := hex.EncodeToString(stakingTransactionPkScript)
 
-	req := SignUnbondingTxRequest{
+	req := types.SignUnbondingTxRequest{
 		StakingOutputPkScriptHex: pkScriptHex,
 		UnbondingTxHex:           unbondingTxHex,
 		CovenantPublicKey:        keyHex,
@@ -77,7 +79,7 @@ func RequestCovenantSignaure(
 		return nil, err
 	}
 
-	var response PublicResponse[SignUnbondingTxResponse]
+	var response handlers.PublicResponse[types.SignUnbondingTxResponse]
 	if err := json.Unmarshal(resBody, &response); err != nil {
 		return nil, err
 	}

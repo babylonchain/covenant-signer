@@ -16,7 +16,6 @@ import (
 	"github.com/babylonchain/covenant-signer/btcclient"
 	"github.com/babylonchain/covenant-signer/config"
 	"github.com/babylonchain/covenant-signer/itest/containers"
-	"github.com/babylonchain/covenant-signer/logger"
 	"github.com/babylonchain/covenant-signer/signerapp"
 	"github.com/babylonchain/covenant-signer/signerservice"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -69,7 +68,6 @@ func defaultStakingData() *stakingData {
 func StartManager(
 	t *testing.T,
 	numMatureOutputsInWallet uint32) *TestManager {
-	logger := logger.DefaultLogger()
 	m, err := containers.NewManager()
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -159,7 +157,6 @@ func StartManager(
 	paramsGetter := signerapp.NewConfigParamsRetriever(parsedconfig.ParamsConfig)
 
 	app := signerapp.NewSignerApp(
-		logger,
 		signer,
 		chainInfo,
 		paramsGetter,
@@ -168,7 +165,6 @@ func StartManager(
 
 	server, err := signerservice.New(
 		context.Background(),
-		logger,
 		parsedconfig,
 		app,
 	)

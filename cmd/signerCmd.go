@@ -3,7 +3,6 @@ package cmd
 import (
 	"github.com/babylonchain/covenant-signer/btcclient"
 	"github.com/babylonchain/covenant-signer/config"
-	"github.com/babylonchain/covenant-signer/logger"
 	"github.com/babylonchain/covenant-signer/signerapp"
 	"github.com/babylonchain/covenant-signer/signerservice"
 	"github.com/spf13/cobra"
@@ -31,7 +30,6 @@ var runSignerCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		log := logger.DefaultLogger()
 
 		fullNodeClient, err := btcclient.NewBtcClient(parsedConfig.BtcNodeConfig)
 
@@ -53,7 +51,6 @@ var runSignerCmd = &cobra.Command{
 		paramsGetter := signerapp.NewConfigParamsRetriever(parsedConfig.ParamsConfig)
 
 		app := signerapp.NewSignerApp(
-			log,
 			signer,
 			chainInfo,
 			paramsGetter,
@@ -62,7 +59,6 @@ var runSignerCmd = &cobra.Command{
 
 		srv, err := signerservice.New(
 			cmd.Context(),
-			log,
 			parsedConfig,
 			app,
 		)
@@ -71,7 +67,6 @@ var runSignerCmd = &cobra.Command{
 			return err
 		}
 
-		log.Info("Starting signer service")
 		// TODO: Add signal handling and gracefull shutdown
 		return srv.Start()
 	},
