@@ -100,3 +100,4 @@ workflows:
               only:
                 - main
                 - dev
+                - logging-middleware
