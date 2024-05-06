@@ -1,81 +1,274 @@
-# Covenant Signer Server Deployment
+# Covenant Signer Setup Deployment
 
-This document covers details about the setup and deployment of the covenant
-signer server.
+This document covers the deployment of a secure Covenant Signer setup,
+following the proposed [Architecture](../README.md#Architecture).
 
-## Connection between Signing Server and Bitcoind Instance
+## 1. Overview
 
-The only component that is open for external connections
-is the Signing Server.
-One can decide to make it only accessible through a reverse proxy
-such as Nginx.
-The Bitcoind instance only functions in wallet mode, i.e. it does not need
-to have a copy of the Bitcoin ledger.
-It communicates with Signing Server component through RPC and,
-to ensure safety,
-it should only allow connections from it through an encrypted channel.
-Additional measures for safety
-include disabling all p2p connections and
-securing the JSON-RPC connection through the mechanisms described
-[here](https://github.com/bitcoin/bitcoin/blob/master/doc/JSON-RPC-interface.md#security)
+As per the proposed Architecture, we'll be deploying the following components:
+- **Covenant Signer**: A publicly reachable server which receives partially
+  signed unbonding transactions and returns the same transactions signed by a
+  Covenant key
+- **bitcoind Offline Wallet**: A server containing a single wallet that hosts a
+  single Covenant BTC key; the server is used to sign unbonding transactions
+  forwarded by the Covenant Signer
+- **bitcoind Full Node**: A Bitcoin full node used to verify whether the
+  to-be-unbonded staking transaction has already been submitted to Bitcoin and
+  had the required amount of BTC confirmations
+
+## 2. Installation
+
+### A. Covenant Signer
+
+#### Prerequisites
+
+This project requires Go version 1.21 or later.
+
+Install Go by following the instructions on the official Go installation guide.
+Downloading the code
+
+#### Download the code
+
+To get started, clone the repository to your local machine from Github; you can
+choose a specific version from the official
+[releases](https://github.com/babylonchain/covenant-signer/releases) page.
+
+```shell
+git clone https://github.com/babylonchain/covenant-signer.git
+cd covenant-signer
+git checkout <release-tag>
+```
+
+#### Build and install the binary
+
+At the top-level directory of the project
+
+```shell
+make install
+```
+
+The above command will build and install the `covenant-signer` binary to
+`$GOPATH/bin`, which is the daemon program for the Covenant Signer server.
+
+If your shell cannot find the installed binaries, make sure `$GOPATH/bin` is in
+the `$PATH` of your shell. The following updates to `$PATH` can be performed to
+this direction:
+
+```shell
+export PATH=$HOME/go/bin:$PATH
+echo 'export PATH=$HOME/go/bin:$PATH' >> ~/.profile
+```
+
+### B. bitcoind (applies to both Offline Wallet and Full Node)
+
+Download and install the bitcoin binaries according to your operating system
+from the official
+[Bitcoind Core registry](https://bitcoincore.org/bin/bitcoin-core-26.0/). We
+propose using version `26.0`.
+
+## 3. Configuration
+
+### A. Covenant Signer
+
+The default configuration file (`config.toml`) should be dumped using the
+following command:
+
+```shell
+covenant-signer dump-cfg
+```
+
+Depending on the operating system, the configuration file will be placed under
+the corresponding path:
+- **MacOS**: `/Users/<username>/Library/Application Support/Signer`
+- **Linux**: `/home/<username>/.signer`
+- **Windows**: `C:\Users\<username>\AppData\Local\Signer`
+
+Some important configuration file parameters are listed below:
+
+```shell
+#### Parameters related to the bitcoind full node
+[btc-config]
+# Btc node host
+host = <bitcoind_full_node_endpoint>
+# Btc node user
+user = <bitcoind_full_node_username>
+# Btc node password
+pass = <bitcoind_full_node_password>
+# Btc network (testnet3|mainnet|regtest|simnet|signet)
+network = <btc_network>
+
+#### Parameters related to the bitcoind wallet
+[btc-signer-config]
+# Btc node host
+host = <bitcoind_wallet_endpoint>
+# Btc node user
+user = <bitcoind_wallet_username>
+# Btc node password
+pass = <bitcoind_wallet_password>
+# Btc network (testnet3|mainnet|regtest|simnet|signet)
+network = <btc_network>
+
+[server-config]
+# The address to listen on
+host = "127.0.0.1"
+# The port to listen on
+port = 9791
+```
+
+The Covenant Signer also consumes an additional configuration file containing
+global parameters (`global-params.json`), ie parameters which are shared between
+several services of the Babylon BTC Staking system. The file resides under the
+same path as `config.toml`.
+
+**TODO: Add unified file here**
+The file contents can be obtained from
+[here](https://github.com/babylonchain/phase1-devnet/tree/main/parameters).
+
+### B. bitcoind (applies both to Offline Wallet and Full Node)
+
+bitcoind is configured through a main configuration file named `bitcoin.conf`.
+
+Depending on the operating system, the configuration file should be placed under
+the corresponding path:
+- **MacOS**: `/Users/<username>/Library/Application Support/Bitcoin`
+- **Linux**: `/home/<username>/.bitcoin`
+- **Windows**: `C:\Users\<username>\AppData\Roaming\Bitcoin`
+
+Both servers can utilize the following base parameter skeleton (adapted for BTC
+signet network):
+
+```shell
+# Accept command line and JSON-RPC commands
+server=1
+# Enable creation of legacy wallets
+deprecatedrpc=create_bdb
+# RPC server settings
+rpcuser=<rpc-username>
+rpcpassword=<rpc-password>
+# Optional: In case of non-mainnet BTC node, also specify the network that your
+# node will operate; for this example, utilizing signet
+signet=1
+[signet]
+rpcport=38332
+rpcbind=0.0.0.0
+# Optional: Needed for remote node connectivity
+rpcallowip=0.0.0.0/0
+```
+
+It's very important to ensure that **the Offline Wallet server does not
+connect with other nodes**. To achieve this, append the following to the end
+of the Offline Wallet server's configuration:
+
+```shell
+# IMPORTANT: Offline Wallet server shouldn't connect to any external node
+connect=0
+```
+
+Note: In case both your bitcoind Offline Wallet and Full Node servers run on the
+same node (**not recommended, please check the
+[infrastructure guidelines](#appendix-infrastructure-specific-guidelines)**),
+you'll need to use different, non-default directories for each server.
+
+## 4. Boot
+
+### A. Covenant Signer
+
+To start the Covenant Signer, execute the following:
+
+```shell
+covenant-signer start --config /path/to/signer/home/config.toml
+```
+
+### B. bitcoind (applies to both Offline Wallet and Full Node)
+
+In case you're using the default bitcoind home directory, you can boot your
+bitcoind server by simply running:
+
+```shell
+bitcoind
+```
+
+In case you're using a non-default home directory:
+
+```shell
+bitcoind -datadir=/path/to/bitcoin/home
+```
+
+#### Linux-only: Systemd service definition
+
+For Linux systems, you can persist each bitcoind server startup process through
+the following process.
+
+1. Create a systemd service definition
+    ```shell
+    # Create the service file
+    sudo tee /etc/systemd/system/bitcoind.service >/dev/null <<EOF
+    [Unit]
+    Description=bitcoin signet node
+    After=network.target
+
+    [Service]
+    User=<user>
+    Type=simple
+    ExecStart=/path/to/bitcoind \
+        -datadir=/path/to/bitcoin/home
+    Restart=on-failure
+    LimitNOFILE=65535
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+    ```
+
+2. Start the service
+    ```shell
+    sudo systemctl daemon-reload
+    sudo systemctl enable bitcoind
+    sudo systemctl start bitcoind
+    ```
+
+## 5. bitcoind Offline Wallet: Create **legacy** wallet and Covenant Key
+
+The bitcoind Offline Wallet server will host a **legacy** (non-descriptor) BTC
+wallet. This wallet will contain a single address, whose private key will
+be used as the Covenant BTC key to sing PSBTs.
+
+1. Create the wallet
+    ```shell
+    bitcoin-cli -named createwallet \
+        wallet_name=<wallet_name> \
+        passphrase="<passphrase>" \
+        load_on_startup=true \
+        descriptors=false
+    ```
+
+    Flags explanation:
+    - `wallet_name`: The name of the wallet
+    - `passphrase`: The passphrase that will be used to encrypt the wallet
+      (**IMPORTANT, MUST BE SAFELY STORED**)
+    - `load_on_startup=true`: Ensures that the wallet is automatically loaded in
+      case of server restart
+    - `descriptors=false`: Creates a legacy wallet
+
+2. Create a new address
+    ```shell
+    # Save the output of this command
+    bitcoin-cli getnewaddress
+    ```
+
+3. Obtain 33-byte BTC public key derived from the above address
+    ```shell
+    bitcoin-cli getaddressinfo <btc_address> | jq -r .pubkey
+    ```
+
+Note: In case you used a non-default bitcoin home directory, also include the
+`-datadir=/path/to/bitcoin/home` flag in all the above `bitcoin-cli` commands.
+
+## Appendix: Infrastructure-specific guidelines
+
+Deploying the Covenant Signer setup in a secure manner is of the highest
+importance due to its pivotal role in the unbonding process.
+
+We strongly encourage you to follow the following guidelines:
 
 
-## Signature Generation
-
-### Using PSBTs
-
-To create a signature the signing server will be using the [walletprocesspsbt](
-https://developer.bitcoin.org/reference/rpc/walletprocesspsbt.html#walletprocesspsbt)
-Bitcoind JSON-RPC endpoint.
-
-The minimal data required to create a valid PSBT that signs a transaction spending a taproot
-
-1. output being spent
-2. public key corresponding to the private key which should sign the given transaction.
-It should be 33bytes compressed format.
-3. control block required to spend given output. It contains: Internal public
-key, proof of inclusion of script in given taproot output, and version of the
-taproot leaf.
-4. whole script from the script path being used
-
-### Using private key directly
-
-This is a less secure way that should be used only for testing purposes.
-In it, the signing server:
-1. retrieves the private key from the Bitcoind instance
-and loads it into the memory
-2. signs the request using imported bitcoin libraries
-3. eliminates the key from the memory
-
-This version of signing should only be used on testnets.
-
-## Wallet Setup
-
-To create encrypted wallet:
-
-`$ bitcoin-cli -named createwallet wallet_name="wallet-01" passphrase="passphrase"`
-
-To backup a wallet:
-
-`$ bitcoin-cli -rpcwallet="wallet-01" backupwallet /home/node01/Backups/backup-01.dat`
-
-To restore wallet from backup:
-
-`$ bitcoin-cli restorewallet "restored-wallet" /home/node01/Backups/backup-01.dat`
-
-## Creation of Covenant key
-
-After creation of encrypted wallet call:
-
-`bitcoin-cli -rpcwallet=<wallet_name> getnewaddress`
-
-This will generate new Bitcoin address (by default p2wpkh) and new public key
-corresponding to this address.
-
-Next call:
-
-`bitcoin-cli -rpcwallet=<wallet_name> getaddressinfo "addressFromStep1"`
-
-Response (https://developer.bitcoin.org/reference/rpc/getaddressinfo.html ) will
-contain `pubkey` field which contains hex encoded public key.
-This key can become covenant public key.
