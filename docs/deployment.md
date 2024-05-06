@@ -233,6 +233,9 @@ The bitcoind Offline Wallet server will host a **legacy** (non-descriptor) BTC
 wallet. This wallet will contain a single address, whose private key will
 be used as the Covenant BTC key to sing PSBTs.
 
+**Throughout this whole process, the bitcoind Offline Wallet should not have
+internet access.**
+
 1. Create the wallet
     ```shell
     bitcoin-cli -named createwallet \
@@ -269,6 +272,54 @@ Note: In case you used a non-default bitcoin home directory, also include the
 Deploying the Covenant Signer setup in a secure manner is of the highest
 importance due to its pivotal role in the unbonding process.
 
-We strongly encourage you to follow the following guidelines:
+We strongly encourage you to follow the following set of guidelines.
 
+### Networking
 
+#### Covenant Signer
+
+- The Covenant Signer is publicly reachable on the configured server port
+- The port accepts only TLS traffic (can be achieved by exposing the Covenant
+  Signer through a reverse proxy)
+- Ideally, the Covenant Signer is also protected against DDoS attacks
+
+#### bitcoind Offline Wallet
+
+- The bitcoind Offline Wallet is only reachable from the Covenant Signer at
+  the designated BTC RPC port
+- The bitcoind Offline Wallet accepts only TLS traffic
+- The bitcoind Offline Wallet lives on a private network and doesn't have
+  internet access
+
+#### bitcoind Full Node
+
+Same with the bitcoind Offline Wallet, but the Node should have internet access
+to sync the BTC ledger.
+
+### Backups
+
+Both the bitcoind Offline Wallet and Full Node servers should be frequently
+backed up on a filesystem level to ensure continuous operation in case of
+failure / data corruption.
+
+We suggest a rolling backup method comprising hourly, daily and weekly backups.
+
+#### Backing up and restoring the bitcoind wallet
+
+For the bitcoind wallet, bitcoin-level backups can also be obtained through the
+following process:
+
+```shell
+# Backup the wallet
+bitcoin-cli -rpcwallet=<wallet-name> backupwallet /path/to/backup/wallet.dat
+# Restore the wallet
+bitcoin-cli restorewallet <wallet-name> /path/to/backup/wallet.dat
+```
+
+### Monitoring
+
+**TODO: Pending on Covenant Signer Prom metrics**
+
+### Hardware requirements
+
+**TODO**
