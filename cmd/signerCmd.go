@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/babylonchain/covenant-signer/btcclient"
 	"github.com/babylonchain/covenant-signer/config"
 	"github.com/babylonchain/covenant-signer/signerapp"
@@ -56,7 +54,6 @@ var runSignerCmd = &cobra.Command{
 		// TODO: Add options to use customn remote signers
 		signer := signerapp.NewPsbtSigner(signerClient)
 
-		fmt.Printf("Confirmation depth is set to %d\n", parsedConfig.SignerConfig.StakingTxConfirmationDepth)
 		app := signerapp.NewSignerApp(
 			signer,
 			chainInfo,

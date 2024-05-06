@@ -14,16 +14,32 @@ import (
 	"github.com/babylonchain/babylon/btcstaking"
 )
 
+func checkPositive(value uint64) error {
+	if value == 0 {
+		return fmt.Errorf("value must be positive")
+	}
+	return nil
+}
+
 func parseTimeLockValue(timelock uint64) (uint16, error) {
 	if timelock > math.MaxUint16 {
 		return 0, fmt.Errorf("timelock value %d is too large. Max: %d", timelock, math.MaxUint16)
 	}
+
+	if err := checkPositive(timelock); err != nil {
+		return 0, fmt.Errorf("invalid timelock value: %w", err)
+	}
+
 	return uint16(timelock), nil
 }
 
 func parseBtcValue(value uint64) (btcutil.Amount, error) {
 	if value > math.MaxInt64 {
 		return 0, fmt.Errorf("value %d is too large. Max: %d", value, math.MaxInt64)
+	}
+
+	if err := checkPositive(value); err != nil {
+		return 0, fmt.Errorf("invalid btc value value: %w", err)
 	}
 	// retrun amount in satoshis
 	return btcutil.Amount(value), nil
@@ -33,6 +49,11 @@ func parseUint32(value uint64) (uint32, error) {
 	if value > math.MaxUint32 {
 		return 0, fmt.Errorf("value %d is too large. Max: %d", value, math.MaxUint32)
 	}
+
+	if err := checkPositive(value); err != nil {
+		return 0, fmt.Errorf("invalid value: %w", err)
+	}
+
 	return uint32(value), nil
 }
 
@@ -246,14 +267,16 @@ func ParseGlobalParams(p *GlobalParams) (*ParsedGlobalParams, error) {
 	}, nil
 }
 
-func (g *ParsedGlobalParams) getVersionedGlobalParamsByHeight(height uint64) *ParsedVersionedGlobalParams {
-	// It is assumed the versions are sorted by activation height in ascending order
-	for _, version := range g.Versions {
-		if version.ActivationHeight <= height {
-			return version
+func (g *ParsedGlobalParams) getVersionedGlobalParamsByHeight(btcHeight uint64) *ParsedVersionedGlobalParams {
+	// Iterate the list in reverse (i.e. decreasing ActivationHeight)
+	// and identify the first element that has an activation height below
+	// the specified BTC height.
+	for i := len(g.Versions) - 1; i >= 0; i-- {
+		paramsVersion := g.Versions[i]
+		if paramsVersion.ActivationHeight <= btcHeight {
+			return paramsVersion
 		}
 	}
-
 	return nil
 }
 

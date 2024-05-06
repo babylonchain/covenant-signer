@@ -1,6 +1,7 @@
 package signerapp_test
 
 import (
+	"context"
 	"encoding/hex"
 	"math"
 	"math/rand"
@@ -106,3 +107,50 @@ func FuzzParseValidParams(f *testing.F) {
 	})
 }
 
+func FuzzRetrievingParametersByHeight(f *testing.F) {
+	bbndatagen.AddRandomSeedsToFuzzer(f, 10)
+	f.Fuzz(func(t *testing.T, seed int64) {
+		r := rand.New(rand.NewSource(seed))
+		numVersions := uint32(r.Int63n(50) + 10)
+		globalParams := genValidGlobalParam(t, r, numVersions)
+		parsedParams, err := signerapp.ParseGlobalParams(globalParams)
+		require.NoError(t, err)
+		numOfParams := len(parsedParams.Versions)
+		randParameterIndex := r.Intn(numOfParams)
+		randVersionedParams := parsedParams.Versions[randParameterIndex]
+
+		// If we are querying exactly by one of the activation height, we shuld always
+		// retriveve original parameters
+		params, err := parsedParams.ParamsByHeight(context.Background(), randVersionedParams.ActivationHeight)
+		require.NoError(t, err)
+		require.NotNil(t, params)
+
+		require.Equal(t, randVersionedParams.CovenantQuorum, params.CovenantQuorum)
+		require.Equal(t, randVersionedParams.CovenantPks, params.CovenantPublicKeys)
+		require.Equal(t, randVersionedParams.Tag, params.MagicBytes)
+		require.Equal(t, randVersionedParams.UnbondingTime, params.UnbondingTime)
+		require.Equal(t, randVersionedParams.UnbondingFee, params.UnbondingFee)
+		require.Equal(t, randVersionedParams.MaxStakingAmount, params.MaxStakingAmount)
+		require.Equal(t, randVersionedParams.MinStakingAmount, params.MinStakingAmount)
+		require.Equal(t, randVersionedParams.MaxStakingTime, params.MaxStakingTime)
+		require.Equal(t, randVersionedParams.MinStakingTime, params.MinStakingTime)
+
+		if randParameterIndex > 0 {
+			// If we are querying by a height that is one before the activations height
+			// of the randomly chosen parameter, we should retrieve previous parameters version
+			params, err := parsedParams.ParamsByHeight(context.Background(), randVersionedParams.ActivationHeight-1)
+			require.NoError(t, err)
+			require.NotNil(t, params)
+			paramsBeforeRand := parsedParams.Versions[randParameterIndex-1]
+			require.Equal(t, paramsBeforeRand.CovenantQuorum, params.CovenantQuorum)
+			require.Equal(t, paramsBeforeRand.CovenantPks, params.CovenantPublicKeys)
+			require.Equal(t, paramsBeforeRand.Tag, params.MagicBytes)
+			require.Equal(t, paramsBeforeRand.UnbondingTime, params.UnbondingTime)
+			require.Equal(t, paramsBeforeRand.UnbondingFee, params.UnbondingFee)
+			require.Equal(t, paramsBeforeRand.MaxStakingAmount, params.MaxStakingAmount)
+			require.Equal(t, paramsBeforeRand.MinStakingAmount, params.MinStakingAmount)
+			require.Equal(t, paramsBeforeRand.MaxStakingTime, params.MaxStakingTime)
+			require.Equal(t, paramsBeforeRand.MinStakingTime, params.MinStakingTime)
+		}
+	})
+}
