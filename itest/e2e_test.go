@@ -178,6 +178,7 @@ func StartManager(
 		signer,
 		chainInfo,
 		parsedGlobalParams,
+		parsedconfig.SignerConfig,
 		netParams,
 	)
 
@@ -258,7 +259,7 @@ func (tm *TestManager) sendStakingTxToBtc(d *stakingData) *stakingTxSigInfo {
 	hash, err := tm.btcClient.SendTx(tx)
 	require.NoError(tm.t, err)
 	// generate blocks to make sure tx will be included into chain
-	_ = tm.bitcoindHandler.GenerateBlocks(7)
+	_ = tm.bitcoindHandler.GenerateBlocks(int(tm.signerConfig.SignerConfig.StakingTxConfirmationDepth + 1))
 	return &stakingTxSigInfo{
 		stakingTxHash: hash,
 		stakingOutput: info.StakingOutput,

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/babylonchain/babylon/btcstaking"
+	"github.com/babylonchain/covenant-signer/config"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
@@ -13,12 +14,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-)
-
-const (
-	// minStakingTxDepth is the minimal depth of staking transaction to consider signing
-	// unbonding transaction for it.
-	minStakingTxDepth = 6
 )
 
 type SpendPathDescription struct {
@@ -76,6 +71,7 @@ type SignerApp struct {
 	s   ExternalBtcSigner
 	r   BtcChainInfo
 	p   BabylonParamsRetriever
+	sc  *config.SignerConfig
 	net *chaincfg.Params
 }
 
@@ -83,12 +79,14 @@ func NewSignerApp(
 	s ExternalBtcSigner,
 	r BtcChainInfo,
 	p BabylonParamsRetriever,
+	sc *config.SignerConfig,
 	net *chaincfg.Params,
 ) *SignerApp {
 	return &SignerApp{
 		s:   s,
 		r:   r,
 		p:   p,
+		sc:  sc,
 		net: net,
 	}
 }
@@ -159,8 +157,14 @@ func (s *SignerApp) SignUnbondingTransaction(
 		return nil, err
 	}
 
-	if bestBlock-stakingTxInfo.TxInclusionHeight < minStakingTxDepth {
-		return nil, fmt.Errorf("staking tx is not mature")
+	stakingTxDepth := bestBlock - stakingTxInfo.TxInclusionHeight
+
+	if stakingTxDepth < s.sc.StakingTxConfirmationDepth {
+		return nil, fmt.Errorf(
+			"staking tx not deep enough. Current depth: %d, required depth: %d",
+			stakingTxDepth,
+			s.sc.StakingTxConfirmationDepth,
+		)
 	}
 
 	parsedStakingTransaction, err := btcstaking.ParseV0StakingTx(
