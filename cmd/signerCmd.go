@@ -16,16 +16,22 @@ var runSignerCmd = &cobra.Command{
 	Use:   "start",
 	Short: "starts the signer service",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		path, err := cmd.Flags().GetString(configPathKey)
+		configPath, err := cmd.Flags().GetString(configPathKey)
 		if err != nil {
 			return err
 		}
-		cfg, err := config.GetConfig(path)
+		cfg, err := config.GetConfig(configPath)
 		if err != nil {
 			return err
 		}
 
 		parsedConfig, err := cfg.Parse()
+
+		if err != nil {
+			return err
+		}
+
+		parsedGlobalParams, err := signerapp.NewGlobalParams(globalParamPath)
 
 		if err != nil {
 			return err
@@ -48,12 +54,10 @@ var runSignerCmd = &cobra.Command{
 		// TODO: Add options to use customn remote signers
 		signer := signerapp.NewPsbtSigner(signerClient)
 
-		paramsGetter := signerapp.NewConfigParamsRetriever(parsedConfig.ParamsConfig)
-
 		app := signerapp.NewSignerApp(
 			signer,
 			chainInfo,
-			paramsGetter,
+			parsedGlobalParams,
 			parsedConfig.BtcNodeConfig.Network,
 		)
 

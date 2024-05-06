@@ -9,47 +9,46 @@
 # will be used to sign psbt's
 [btc-config]
 # Btc node host
-host = "localhost:18556"
+host = "bitcoind.bitcoind-signet:38332"
 # Btc node user
-user = "user"
+user = "XX"
 # Btc node password
-pass = "pass"
+pass = "XX"
 # Btc network (testnet3|mainnet|regtest|simnet|signet)
-network = "regtest"
+network = "signet"
 
 [btc-signer-config]
 # Btc node host
-host = "localhost:18556"
-# TODO: consider reading user/pass from command line
+host = "bitcoind.bitcoind-signet:38332"
 # Btc node user
-user = "user"
+user = "XX"
 # Btc node password
-pass = "pass"
+pass = "XX"
 # Btc network (testnet3|mainnet|regtest|simnet|signet)
-network = "regtest"
+network = "signet"
 
 [params-config]
 # The list of covenant public keys
-covenant_public_keys = []
+covenant_public_keys = ["0238229981b0de122a6528a05df266bcdf0c8e499bbe3a705032c6badec3587336", "029e471d813e82e4685a1d814902809d207e6f71d5dcb41f55450e9111659ca6a7", "0238da2198ab73f569c5885dd5c13388eaaf38bc7407330bddf10645039c64ca3c", "03c77d4a7f2406b6d66b606d2cad7c8fc900f5243beca762afea66cdbb014892b2", "03e2b49e1b0c6f79e124a469465bee491096ef49279ba8b8e1f0fca5e37d5faecd"]
 
 # The quorum of the covenants required to sign the transaction
-covenant_quorum = 0
+covenant_quorum = 3
 
 # The magic bytes of the network
-magic_bytes = "01020304"
+magic_bytes = "62627434"
 
 # The number of confirmations required for the staking transaction to be mature
 w = 100
 
 # Timelock in unbonding transaction
-unbonding_time = 100
+unbonding_time = 1000
 
 # Required fee for unbonding transaction
 unbonding_fee = 10000
 
 [server-config]
 # The address to listen on
-host = "127.0.0.1"
+host = "0.0.0.0"
 
 # The port to listen on
 port = 9791
@@ -62,4 +61,3 @@ write-timeout = 15
 
 # Idle timeout in seconds
 idle-timeout = 120
-

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
 	"github.com/babylonchain/babylon/btcstaking"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -12,6 +13,12 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+)
+
+const (
+	// minStakingTxDepth is the minimal depth of staking transaction to consider signing
+	// unbonding transaction for it.
+	minStakingTxDepth = 6
 )
 
 type SpendPathDescription struct {
@@ -52,13 +59,17 @@ type BabylonParams struct {
 	CovenantPublicKeys []*btcec.PublicKey
 	CovenantQuorum     uint32
 	MagicBytes         []byte
-	W                  uint32
 	UnbondingTime      uint16
 	UnbondingFee       btcutil.Amount
+	MaxStakingAmount   btcutil.Amount
+	MinStakingAmount   btcutil.Amount
+	MaxStakingTime     uint16
+	MinStakingTime     uint16
 }
 
 type BabylonParamsRetriever interface {
-	Params(ctx context.Context) (*BabylonParams, error)
+	// ParamsByHeight
+	ParamsByHeight(ctx context.Context, height uint64) (*BabylonParams, error)
 }
 
 type SignerApp struct {
@@ -142,13 +153,13 @@ func (s *SignerApp) SignUnbondingTransaction(
 
 	// TODO: This should probably be done when service is started, otherwise if we implement
 	// retrieving params from service we will call it for every signing request
-	params, err := s.p.Params(ctx)
+	params, err := s.p.ParamsByHeight(ctx, uint64(stakingTxInfo.TxInclusionHeight))
 
 	if err != nil {
 		return nil, err
 	}
 
-	if bestBlock-stakingTxInfo.TxInclusionHeight < params.W {
+	if bestBlock-stakingTxInfo.TxInclusionHeight < minStakingTxDepth {
 		return nil, fmt.Errorf("staking tx is not mature")
 	}
 
@@ -169,6 +180,16 @@ func (s *SignerApp) SignUnbondingTransaction(
 		// This is actually eror of our parameters configuaration and should not happen
 		// for honest requests.
 		return nil, fmt.Errorf("staking output value is too low")
+	}
+
+	if parsedStakingTransaction.OpReturnData.StakingTime < params.MinStakingTime ||
+		parsedStakingTransaction.OpReturnData.StakingTime > params.MaxStakingTime {
+		return nil, fmt.Errorf("staking time of staking tx with hash: %s is out of bounds", stakingTxHash.String())
+	}
+
+	if parsedStakingTransaction.StakingOutput.Value < int64(params.MinStakingAmount) ||
+		parsedStakingTransaction.StakingOutput.Value > int64(params.MaxStakingAmount) {
+		return nil, fmt.Errorf("staking amount of staking tx with hash: %s is out of bounds", stakingTxHash.String())
 	}
 
 	// build expected output in unbonding transaction

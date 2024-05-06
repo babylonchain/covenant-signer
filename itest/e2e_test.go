@@ -139,14 +139,33 @@ func StartManager(
 	mb := []byte{0x0, 0x1, 0x2, 0x3}
 	appConfig.Server.Host = "127.0.0.1"
 	appConfig.Server.Port = 10090
-	appConfig.Params.CovenantQuorum = 2
-	appConfig.Params.MagicBytes = hex.EncodeToString(mb)
-	appConfig.Params.W = 1
-	appConfig.Params.CovenantPublicKeys = []string{
+
+	testParams := signerapp.VersionedGlobalParams{}
+
+	testParams.StakingCap = 10000000000
+	testParams.Tag = hex.EncodeToString(mb)
+	testParams.CovenantPks = []string{
 		hex.EncodeToString(localCovenantKey.SerializeCompressed()),
 		hex.EncodeToString(remoteCovenantKey1.PubKey().SerializeCompressed()),
 		hex.EncodeToString(remoteCovenantKey2.PubKey().SerializeCompressed()),
 	}
+	testParams.CovenantQuorum = 2
+	testParams.UnbondingTime = 100
+	testParams.UnbondingFee = 10000
+	testParams.MinStakingTime = 10000
+	testParams.MaxStakingTime = 10000
+	testParams.MinStakingAmount = 10000
+	testParams.MaxStakingAmount = 10000000
+
+	// TODO: Update tests to create json file and read from it.
+	globalParams := signerapp.GlobalParams{
+		Versions: []*signerapp.VersionedGlobalParams{
+			&testParams,
+		},
+	}
+
+	parsedGlobalParams, err := signerapp.ParseGlobalParams(&globalParams)
+	require.NoError(t, err)
 
 	parsedconfig, err := appConfig.Parse()
 	require.NoError(t, err)
@@ -154,12 +173,11 @@ func StartManager(
 	// In e2e test we are using the same node for signing as for indexing funcitonalities
 	chainInfo := signerapp.NewBitcoindChainInfo(client)
 	signer := signerapp.NewPsbtSigner(client)
-	paramsGetter := signerapp.NewConfigParamsRetriever(parsedconfig.ParamsConfig)
 
 	app := signerapp.NewSignerApp(
 		signer,
 		chainInfo,
-		paramsGetter,
+		parsedGlobalParams,
 		netParams,
 	)
 
@@ -188,10 +206,10 @@ func StartManager(
 		walletPass:            passphrase,
 		btcClient:             client,
 		localCovenantPubKey:   localCovenantKey,
-		allCovenantKeys:       parsedconfig.ParamsConfig.CovenantPublicKeys,
-		covenantQuorum:        appConfig.Params.CovenantQuorum,
-		requiredUnbondingTime: parsedconfig.ParamsConfig.UnbondingTime,
-		requiredUnbondingFee:  parsedconfig.ParamsConfig.UnbondingFee,
+		allCovenantKeys:       parsedGlobalParams.Versions[0].CovenantPks,
+		covenantQuorum:        parsedGlobalParams.Versions[0].CovenantQuorum,
+		requiredUnbondingTime: parsedGlobalParams.Versions[0].UnbondingTime,
+		requiredUnbondingFee:  parsedGlobalParams.Versions[0].UnbondingFee,
 		finalityProviderKey:   fpKey,
 		stakerAddress:         walletAddress,
 		stakerPubKey:          stakerPubKey,
@@ -240,7 +258,7 @@ func (tm *TestManager) sendStakingTxToBtc(d *stakingData) *stakingTxSigInfo {
 	hash, err := tm.btcClient.SendTx(tx)
 	require.NoError(tm.t, err)
 	// generate blocks to make sure tx will be included into chain
-	_ = tm.bitcoindHandler.GenerateBlocks(2)
+	_ = tm.bitcoindHandler.GenerateBlocks(7)
 	return &stakingTxSigInfo{
 		stakingTxHash: hash,
 		stakingOutput: info.StakingOutput,
