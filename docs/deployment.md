@@ -14,7 +14,7 @@ As per the proposed Architecture, we'll be deploying the following components:
   forwarded by the Covenant Signer
 - **bitcoind Full Node**: A Bitcoin full node used to verify whether the
   to-be-unbonded staking transaction has already been submitted to Bitcoin and
-  had the required amount of BTC confirmations
+  has the required amount of BTC confirmations
 
 **For a production system, we strongly recommend that the bitcoind Offline Wallet
 and Full Node are distinct bitcoind instances operating on different hosts**.
@@ -31,7 +31,7 @@ and Full Node are almost identical.
 Download and install the bitcoin binaries according to your operating system
 from the official
 [Bitcoind Core registry](https://bitcoincore.org/bin/bitcoin-core-26.0/). We
-propose using version `26.0`.
+recommend using version `26.0`.
 
 ### B. Configuration
 
@@ -73,10 +73,20 @@ of the Offline Wallet server's configuration:
 connect=0
 ```
 
-Note: In case both your bitcoind Offline Wallet and Full Node servers run on the
-same node (**not recommended, please check the
-[infrastructure guidelines](#appendix-infrastructure-specific-guidelines)**),
-you'll need to use different, non-default directories for each server.
+Notes:
+- In case both your bitcoind Offline Wallet and Full Node servers run on the
+  same node (**not recommended, please check the
+  [infrastructure guidelines](#appendix-infrastructure-specific-guidelines)**),
+  you'll need to use different, non-default directories for each server.
+- Instead of hardcoding the RPC server password (`rpcpassword`) in the config,
+  it is recommended to generate its salted hash and use the `rpcauth` field
+  instead. To generate the salted hash, you can use
+  [this platform](https://jlopp.github.io/bitcoin-core-rpc-auth-generator/)
+  as reference - however, the salting operation should be executed locally.
+  The resulting config value will look like this:
+  ```shell
+  rpcauth=<rpc-password-salted-hash>
+  ```
 
 ### C. Boot
 
@@ -175,11 +185,10 @@ Note: In case you used a non-default bitcoin home directory, also include the
 This project requires Go version 1.21 or later.
 
 Install Go by following the instructions on the official Go installation guide.
-Downloading the code
 
 #### Download the code
 
-To get started, clone the repository to your local machine from Github; you can
+To get started, clone the repository to your local machine from GitHub; you can
 choose a specific version from the official
 [releases](https://github.com/babylonchain/covenant-signer/releases) page.
 
@@ -235,7 +244,7 @@ host = <bitcoind_full_node_endpoint>
 user = <bitcoind_full_node_username>
 # Btc node password
 pass = <bitcoind_full_node_password>
-# Btc network (testnet3|mainnet|regtest|simnet|signet)
+# Btc network (testnet3|mainnet|regtest|signet)
 network = <btc_network>
 
 #### Parameters related to the bitcoind wallet
@@ -246,7 +255,7 @@ host = <bitcoind_wallet_endpoint>
 user = <bitcoind_wallet_username>
 # Btc node password
 pass = <bitcoind_wallet_password>
-# Btc network (testnet3|mainnet|regtest|simnet|signet)
+# Btc network (testnet3|mainnet|regtest|signet)
 network = <btc_network>
 
 [server-config]
@@ -257,9 +266,9 @@ port = 9791
 ```
 
 The Covenant Signer also consumes an additional configuration file containing
-global parameters (`global-params.json`), ie parameters which are shared between
-several services of the Babylon BTC Staking system. The file resides under the
-same path as `config.toml`.
+global parameters (`global-params.json`), i.e. parameters which are shared
+between several services of the Babylon BTC Staking system. The file resides
+under the same directory as `config.toml`.
 
 The file contents can be obtained from
 [here](https://github.com/babylonchain/phase1-devnet/tree/main/parameters).
