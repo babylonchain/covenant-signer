@@ -15,7 +15,6 @@ type Config struct {
 	// TODO: Separate config for signing node and for full node
 	BtcNodeConfig   BtcConfig    `mapstructure:"btc-config"`
 	BtcSignerConfig BtcConfig    `mapstructure:"btc-signer-config"`
-	SignerConfig    SignerConfig `mapstructure:"signer-config"`
 	Server          ServerConfig `mapstructure:"server-config"`
 }
 
@@ -23,7 +22,6 @@ func DefaultConfig() *Config {
 	return &Config{
 		BtcNodeConfig:   *DefaultBtcConfig(),
 		BtcSignerConfig: *DefaultBtcConfig(),
-		SignerConfig:    *DefaultSignerConfig(),
 		Server:          *DefaultServerConfig(),
 	}
 }
@@ -31,7 +29,6 @@ func DefaultConfig() *Config {
 type ParsedConfig struct {
 	BtcNodeConfig   *ParsedBtcConfig
 	BtcSignerConfig *ParsedBtcConfig
-	SignerConfig    *SignerConfig
 	ServerConfig    *ParsedServerConfig
 }
 
@@ -57,7 +54,6 @@ func (cfg *Config) Parse() (*ParsedConfig, error) {
 		BtcNodeConfig:   btcConfig,
 		BtcSignerConfig: btcSignerConfig,
 		ServerConfig:    serverConfig,
-		SignerConfig:    &cfg.SignerConfig,
 	}, nil
 }
 

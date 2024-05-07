@@ -33,6 +33,18 @@ func parseTimeLockValue(timelock uint64) (uint16, error) {
 	return uint16(timelock), nil
 }
 
+func parseConfirmationDepthValue(confirmationDepth uint64) (uint16, error) {
+	if confirmationDepth > math.MaxUint16 {
+		return 0, fmt.Errorf("timelock value %d is too large. Max: %d", confirmationDepth, math.MaxUint16)
+	}
+
+	if err := checkPositive(confirmationDepth); err != nil {
+		return 0, fmt.Errorf("invalid confirmation depth value: %w", err)
+	}
+
+	return uint16(confirmationDepth), nil
+}
+
 func parseBtcValue(value uint64) (btcutil.Amount, error) {
 	if value > math.MaxInt64 {
 		return 0, fmt.Errorf("value %d is too large. Max: %d", value, math.MaxInt64)
@@ -76,18 +88,19 @@ func parseCovenantPubKeyFromHex(pkStr string) (*btcec.PublicKey, error) {
 var _ BabylonParamsRetriever = (*ParsedGlobalParams)(nil)
 
 type VersionedGlobalParams struct {
-	Version          uint64   `json:"version"`
-	ActivationHeight uint64   `json:"activation_height"`
-	StakingCap       uint64   `json:"staking_cap"`
-	Tag              string   `json:"tag"`
-	CovenantPks      []string `json:"covenant_pks"`
-	CovenantQuorum   uint64   `json:"covenant_quorum"`
-	UnbondingTime    uint64   `json:"unbonding_time"`
-	UnbondingFee     uint64   `json:"unbonding_fee"`
-	MaxStakingAmount uint64   `json:"max_staking_amount"`
-	MinStakingAmount uint64   `json:"min_staking_amount"`
-	MaxStakingTime   uint64   `json:"max_staking_time"`
-	MinStakingTime   uint64   `json:"min_staking_time"`
+	Version           uint64   `json:"version"`
+	ActivationHeight  uint64   `json:"activation_height"`
+	StakingCap        uint64   `json:"staking_cap"`
+	Tag               string   `json:"tag"`
+	CovenantPks       []string `json:"covenant_pks"`
+	CovenantQuorum    uint64   `json:"covenant_quorum"`
+	UnbondingTime     uint64   `json:"unbonding_time"`
+	UnbondingFee      uint64   `json:"unbonding_fee"`
+	MaxStakingAmount  uint64   `json:"max_staking_amount"`
+	MinStakingAmount  uint64   `json:"min_staking_amount"`
+	MaxStakingTime    uint64   `json:"max_staking_time"`
+	MinStakingTime    uint64   `json:"min_staking_time"`
+	ConfirmationDepth uint64   `json:"confirmation_depth"`
 }
 
 type GlobalParams struct {
@@ -99,18 +112,19 @@ type ParsedGlobalParams struct {
 }
 
 type ParsedVersionedGlobalParams struct {
-	Version          uint64
-	ActivationHeight uint64
-	StakingCap       btcutil.Amount
-	Tag              []byte
-	CovenantPks      []*btcec.PublicKey
-	CovenantQuorum   uint32
-	UnbondingTime    uint16
-	UnbondingFee     btcutil.Amount
-	MaxStakingAmount btcutil.Amount
-	MinStakingAmount btcutil.Amount
-	MaxStakingTime   uint16
-	MinStakingTime   uint16
+	Version           uint64
+	ActivationHeight  uint64
+	StakingCap        btcutil.Amount
+	Tag               []byte
+	CovenantPks       []*btcec.PublicKey
+	CovenantQuorum    uint32
+	UnbondingTime     uint16
+	UnbondingFee      btcutil.Amount
+	MaxStakingAmount  btcutil.Amount
+	MinStakingAmount  btcutil.Amount
+	MaxStakingTime    uint16
+	MinStakingTime    uint16
+	ConfirmationDepth uint16
 }
 
 func NewGlobalParams(filePath string) (*ParsedGlobalParams, error) {
@@ -209,24 +223,30 @@ func parseVersionedGlobalParams(p *VersionedGlobalParams) (*ParsedVersionedGloba
 		return nil, fmt.Errorf("max-staking-time must be larger or equalt min-staking-time")
 	}
 
+	confirmationDepth, err := parseConfirmationDepthValue(p.ConfirmationDepth)
+	if err != nil {
+		return nil, fmt.Errorf("invalid confirmation_depth: %w", err)
+	}
+
 	stakingCap, err := parseBtcValue(p.StakingCap)
 	if err != nil {
 		return nil, fmt.Errorf("invalid staking_cap: %w", err)
 	}
 
 	return &ParsedVersionedGlobalParams{
-		Version:          p.Version,
-		ActivationHeight: p.ActivationHeight,
-		StakingCap:       stakingCap,
-		Tag:              tag,
-		CovenantPks:      covenantKeys,
-		CovenantQuorum:   quroum,
-		UnbondingTime:    ubTime,
-		UnbondingFee:     ubFee,
-		MaxStakingAmount: maxStakingAmount,
-		MinStakingAmount: minStakingAmount,
-		MaxStakingTime:   maxStakingTime,
-		MinStakingTime:   minStakingTime,
+		Version:           p.Version,
+		ActivationHeight:  p.ActivationHeight,
+		StakingCap:        stakingCap,
+		Tag:               tag,
+		CovenantPks:       covenantKeys,
+		CovenantQuorum:    quroum,
+		UnbondingTime:     ubTime,
+		UnbondingFee:      ubFee,
+		MaxStakingAmount:  maxStakingAmount,
+		MinStakingAmount:  minStakingAmount,
+		MaxStakingTime:    maxStakingTime,
+		MinStakingTime:    minStakingTime,
+		ConfirmationDepth: confirmationDepth,
 	}, nil
 }
 
@@ -296,5 +316,6 @@ func (g *ParsedGlobalParams) ParamsByHeight(_ context.Context, height uint64) (*
 		MinStakingAmount:   versionedParams.MinStakingAmount,
 		MaxStakingTime:     versionedParams.MaxStakingTime,
 		MinStakingTime:     versionedParams.MinStakingTime,
+		ConfirmationDepth:  versionedParams.ConfirmationDepth,
 	}, nil
 }

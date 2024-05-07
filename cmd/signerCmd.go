@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"github.com/spf13/cobra"
+
 	"github.com/babylonchain/covenant-signer/btcclient"
 	"github.com/babylonchain/covenant-signer/config"
 	"github.com/babylonchain/covenant-signer/signerapp"
 	"github.com/babylonchain/covenant-signer/signerservice"
-	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -58,7 +59,6 @@ var runSignerCmd = &cobra.Command{
 			signer,
 			chainInfo,
 			parsedGlobalParams,
-			parsedConfig.SignerConfig,
 			parsedConfig.BtcNodeConfig.Network,
 		)
 

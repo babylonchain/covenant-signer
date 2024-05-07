@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/babylonchain/babylon/btcstaking"
-	"github.com/babylonchain/covenant-signer/config"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
@@ -60,6 +59,7 @@ type BabylonParams struct {
 	MinStakingAmount   btcutil.Amount
 	MaxStakingTime     uint16
 	MinStakingTime     uint16
+	ConfirmationDepth  uint16
 }
 
 type BabylonParamsRetriever interface {
@@ -71,7 +71,6 @@ type SignerApp struct {
 	s   ExternalBtcSigner
 	r   BtcChainInfo
 	p   BabylonParamsRetriever
-	sc  *config.SignerConfig
 	net *chaincfg.Params
 }
 
@@ -79,14 +78,12 @@ func NewSignerApp(
 	s ExternalBtcSigner,
 	r BtcChainInfo,
 	p BabylonParamsRetriever,
-	sc *config.SignerConfig,
 	net *chaincfg.Params,
 ) *SignerApp {
 	return &SignerApp{
 		s:   s,
 		r:   r,
 		p:   p,
-		sc:  sc,
 		net: net,
 	}
 }
@@ -159,11 +156,11 @@ func (s *SignerApp) SignUnbondingTransaction(
 
 	stakingTxDepth := bestBlock - stakingTxInfo.TxInclusionHeight
 
-	if stakingTxDepth < s.sc.StakingTxConfirmationDepth {
+	if stakingTxDepth < uint32(params.ConfirmationDepth) {
 		return nil, fmt.Errorf(
 			"staking tx not deep enough. Current depth: %d, required depth: %d",
 			stakingTxDepth,
-			s.sc.StakingTxConfirmationDepth,
+			params.ConfirmationDepth,
 		)
 	}
 

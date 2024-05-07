@@ -13,17 +13,18 @@ import (
 	"github.com/babylonchain/babylon/btcstaking"
 	staking "github.com/babylonchain/babylon/btcstaking"
 
-	"github.com/babylonchain/covenant-signer/btcclient"
-	"github.com/babylonchain/covenant-signer/config"
-	"github.com/babylonchain/covenant-signer/itest/containers"
-	"github.com/babylonchain/covenant-signer/signerapp"
-	"github.com/babylonchain/covenant-signer/signerservice"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
+
+	"github.com/babylonchain/covenant-signer/btcclient"
+	"github.com/babylonchain/covenant-signer/config"
+	"github.com/babylonchain/covenant-signer/itest/containers"
+	"github.com/babylonchain/covenant-signer/signerapp"
+	"github.com/babylonchain/covenant-signer/signerservice"
 )
 
 var (
@@ -45,6 +46,7 @@ type TestManager struct {
 	stakerPubKey          *btcec.PublicKey
 	magicBytes            []byte
 	requiredUnbondingTime uint16
+	confirmationDepth     uint16
 	requiredUnbondingFee  btcutil.Amount
 	signerConfig          *config.Config
 	app                   *signerapp.SignerApp
@@ -61,7 +63,7 @@ func defaultStakingData() *stakingData {
 	return &stakingData{
 		stakingAmount:  btcutil.Amount(100000),
 		stakingTime:    10000,
-		stakingFeeRate: btcutil.Amount(5000), //feeRatePerKb
+		stakingFeeRate: btcutil.Amount(5000), // feeRatePerKb
 	}
 }
 
@@ -156,6 +158,7 @@ func StartManager(
 	testParams.MaxStakingTime = 10000
 	testParams.MinStakingAmount = 10000
 	testParams.MaxStakingAmount = 10000000
+	testParams.ConfirmationDepth = 10
 
 	// TODO: Update tests to create json file and read from it.
 	globalParams := signerapp.GlobalParams{
@@ -170,7 +173,7 @@ func StartManager(
 	parsedconfig, err := appConfig.Parse()
 	require.NoError(t, err)
 
-	// In e2e test we are using the same node for signing as for indexing funcitonalities
+	// In e2e test we are using the same node for signing as for indexing functionalities
 	chainInfo := signerapp.NewBitcoindChainInfo(client)
 	signer := signerapp.NewPsbtSigner(client)
 
@@ -178,7 +181,6 @@ func StartManager(
 		signer,
 		chainInfo,
 		parsedGlobalParams,
-		parsedconfig.SignerConfig,
 		netParams,
 	)
 
@@ -211,6 +213,7 @@ func StartManager(
 		covenantQuorum:        parsedGlobalParams.Versions[0].CovenantQuorum,
 		requiredUnbondingTime: parsedGlobalParams.Versions[0].UnbondingTime,
 		requiredUnbondingFee:  parsedGlobalParams.Versions[0].UnbondingFee,
+		confirmationDepth:     parsedGlobalParams.Versions[0].ConfirmationDepth,
 		finalityProviderKey:   fpKey,
 		stakerAddress:         walletAddress,
 		stakerPubKey:          stakerPubKey,
@@ -259,7 +262,7 @@ func (tm *TestManager) sendStakingTxToBtc(d *stakingData) *stakingTxSigInfo {
 	hash, err := tm.btcClient.SendTx(tx)
 	require.NoError(tm.t, err)
 	// generate blocks to make sure tx will be included into chain
-	_ = tm.bitcoindHandler.GenerateBlocks(int(tm.signerConfig.SignerConfig.StakingTxConfirmationDepth + 1))
+	_ = tm.bitcoindHandler.GenerateBlocks(int(tm.confirmationDepth + 1))
 	return &stakingTxSigInfo{
 		stakingTxHash: hash,
 		stakingOutput: info.StakingOutput,

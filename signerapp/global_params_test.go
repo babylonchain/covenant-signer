@@ -9,10 +9,11 @@ import (
 
 	bbndatagen "github.com/babylonchain/babylon/testutil/datagen"
 
-	"github.com/babylonchain/covenant-signer/signerapp"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/stretchr/testify/require"
+
+	"github.com/babylonchain/covenant-signer/signerapp"
 )
 
 var (
@@ -31,18 +32,19 @@ func generateInitParams(t *testing.T, r *rand.Rand) *signerapp.VersionedGlobalPa
 	}
 
 	gp := signerapp.VersionedGlobalParams{
-		Version:          0,
-		ActivationHeight: 0,
-		StakingCap:       uint64(r.Int63n(int64(initialCapMin)) + int64(initialCapMin)),
-		Tag:              tag,
-		CovenantPks:      pks,
-		CovenantQuorum:   uint64(quorum),
-		UnbondingTime:    uint64(r.Int63n(100) + 100),
-		UnbondingFee:     uint64(r.Int63n(100000) + 100000),
-		MaxStakingAmount: uint64(r.Int63n(100000000) + 100000000),
-		MinStakingAmount: uint64(r.Int63n(1000000) + 1000000),
-		MaxStakingTime:   math.MaxUint16,
-		MinStakingTime:   uint64(r.Int63n(10000) + 10000),
+		Version:           0,
+		ActivationHeight:  0,
+		StakingCap:        uint64(r.Int63n(int64(initialCapMin)) + int64(initialCapMin)),
+		Tag:               tag,
+		CovenantPks:       pks,
+		CovenantQuorum:    uint64(quorum),
+		UnbondingTime:     uint64(r.Int63n(100) + 100),
+		UnbondingFee:      uint64(r.Int63n(100000) + 100000),
+		MaxStakingAmount:  uint64(r.Int63n(100000000) + 100000000),
+		MinStakingAmount:  uint64(r.Int63n(1000000) + 1000000),
+		MaxStakingTime:    math.MaxUint16,
+		MinStakingTime:    uint64(r.Int63n(10000) + 10000),
+		ConfirmationDepth: uint64(r.Int63n(100) + 100),
 	}
 
 	return &gp
@@ -103,6 +105,7 @@ func FuzzParseValidParams(f *testing.F) {
 			require.Equal(t, globalParams.Versions[i].MinStakingAmount, uint64(p.MinStakingAmount))
 			require.Equal(t, globalParams.Versions[i].MaxStakingTime, uint64(p.MaxStakingTime))
 			require.Equal(t, globalParams.Versions[i].MinStakingTime, uint64(p.MinStakingTime))
+			require.Equal(t, globalParams.Versions[i].ConfirmationDepth, uint64(p.ConfirmationDepth))
 		}
 	})
 }
@@ -134,6 +137,7 @@ func FuzzRetrievingParametersByHeight(f *testing.F) {
 		require.Equal(t, randVersionedParams.MinStakingAmount, params.MinStakingAmount)
 		require.Equal(t, randVersionedParams.MaxStakingTime, params.MaxStakingTime)
 		require.Equal(t, randVersionedParams.MinStakingTime, params.MinStakingTime)
+		require.Equal(t, randVersionedParams.ConfirmationDepth, params.ConfirmationDepth)
 
 		if randParameterIndex > 0 {
 			// If we are querying by a height that is one before the activations height
@@ -151,6 +155,7 @@ func FuzzRetrievingParametersByHeight(f *testing.F) {
 			require.Equal(t, paramsBeforeRand.MinStakingAmount, params.MinStakingAmount)
 			require.Equal(t, paramsBeforeRand.MaxStakingTime, params.MaxStakingTime)
 			require.Equal(t, paramsBeforeRand.MinStakingTime, params.MinStakingTime)
+			require.Equal(t, paramsBeforeRand.ConfirmationDepth, params.ConfirmationDepth)
 		}
 	})
 }
