@@ -23,7 +23,7 @@ bitcoind instances can run on the same host.
 
 ## 2. bitcoind setup (applies to both Offline Wallet and Full Node)
 
-The Installation, Configuration and Boot steps for the bitcoind Offline Wallet
+The installation, configuration and boot steps for the bitcoind Offline Wallet
 and Full Node are almost identical.
 
 ### A. Installation
