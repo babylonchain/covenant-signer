@@ -188,8 +188,9 @@ Install Go by following the instructions on the official Go installation guide.
 
 #### Download the code
 
-To get started, clone the repository to your local machine from GitHub; you can
-choose a specific version from the official
+To get started, clone the repository to your local machine from GitHub; please
+use the version according to the phase-1 system guidelines --
+you can find all versions in the official
 [releases](https://github.com/babylonchain/covenant-signer/releases) page.
 
 ```shell
