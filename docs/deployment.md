@@ -261,7 +261,6 @@ global parameters (`global-params.json`), ie parameters which are shared between
 several services of the Babylon BTC Staking system. The file resides under the
 same path as `config.toml`.
 
-**TODO: Add unified file here**
 The file contents can be obtained from
 [here](https://github.com/babylonchain/phase1-devnet/tree/main/parameters).
 
@@ -346,4 +345,25 @@ bitcoin-cli restorewallet <wallet-name> /path/to/backup/wallet.dat
 
 ### Monitoring
 
-**TODO: Pending on Covenant Signer Prom metrics**
+As the Covenant Signer will be exposing Prometheus metrics, this section will be
+focused around Prometheus-based monitoring.
+
+#### Covenant Signer
+
+Healthchecks should be configured on the `/v1/sign-unbonding-tx` server HTTP
+endpoint.
+
+One approach to perform HTTP/S healthchecks and expose results in the form of
+Prometheus metrics is the
+[Prometheus Blackbox Exporter](https://github.com/prometheus/blackbox_exporter).
+
+These metrics can then be scraped by a Prometheus instance.
+
+#### bitcoind
+
+The bitcoind server availability can be polled through Prometheus Blackbox
+Exporter.
+
+Bitcoin-specific Prometheus metrics can also be exposed by utilizing any
+open-source Prometheus bitcoind exporter
+([example](https://github.com/jvstein/bitcoin-prometheus-exporter?tab=readme-ov-file)).
