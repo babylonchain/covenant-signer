@@ -25,7 +25,7 @@ var (
 	//   ~/Library/Application Support/tools on MacOS
 	dafaultConfigDir        = btcutil.AppDataDir("signer", false)
 	dafaultConfigPath       = filepath.Join(dafaultConfigDir, "config.toml")
-	defaultGlobalParamsPath = filepath.Join(dafaultConfigDir, "global_params.json")
+	defaultGlobalParamsPath = filepath.Join(dafaultConfigDir, "global-params.json")
 )
 
 // Execute executes the root command.
