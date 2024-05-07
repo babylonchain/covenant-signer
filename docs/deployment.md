@@ -5,12 +5,12 @@ following the proposed [Architecture](../README.md#Architecture).
 
 ## 1. Overview
 
-As per the proposed Architecture, we'll be deploying the following components:
+The architecture contains the following components that need to be deployed:
 - **Covenant Signer**: A publicly reachable server which receives partially
-  signed unbonding transactions and returns the same transactions signed by a
-  Covenant key
+  signed unbonding transactions and returns the same transactions signed by
+  the covenant emulator's key
 - **bitcoind Offline Wallet**: A server containing a single wallet that hosts a
-  single Covenant BTC key; the server is used to sign unbonding transactions
+  single Covenant emulator BTC key; the server is used for signing unbonding transactions
   forwarded by the Covenant Signer
 - **bitcoind Full Node**: A Bitcoin full node used to verify whether the
   to-be-unbonded staking transaction has already been submitted to Bitcoin and
@@ -18,7 +18,7 @@ As per the proposed Architecture, we'll be deploying the following components:
 
 **For a production system, we strongly recommend that the bitcoind Offline Wallet
 and Full Node are distinct bitcoind instances operating on different hosts**.
-For a PoC setup, one bitcoind instance can serve as both the entities, or both
+For a PoC/testnet setup, one bitcoind instance can serve as both the entities, or both
 bitcoind instances can run on the same host.
 
 ## 2. bitcoind setup (applies to both Offline Wallet and Full Node)
@@ -43,7 +43,7 @@ the corresponding path:
 - **Linux**: `/home/<username>/.bitcoin`
 - **Windows**: `C:\Users\<username>\AppData\Roaming\Bitcoin`
 
-Both servers can utilize the following base parameter skeleton (adapted for BTC
+Both servers can utilize the following base parameter skeleton (adapted for the BTC
 signet network):
 
 ```shell
