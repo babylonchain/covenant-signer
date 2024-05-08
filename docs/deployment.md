@@ -6,8 +6,8 @@ following the proposed [Architecture](../README.md#Architecture).
 ## 1. Overview
 
 The architecture contains the following components that need to be deployed:
-- **Covenant Signer**: A publicly reachable server which receives partially
-  signed unbonding transactions and returns the same transactions signed by
+- **Covenant Signer**: A publicly reachable server which receives
+  unbonding transactions and returns the same transactions signed by
   the covenant emulator's key
 - **bitcoind Offline Wallet**: A server containing a single wallet that hosts a
   single Covenant emulator BTC key; the server is used for signing unbonding transactions
@@ -49,8 +49,6 @@ signet network):
 ```shell
 # Accept command line and JSON-RPC commands
 server=1
-# Enable creation of legacy wallets
-deprecatedrpc=create_bdb
 # RPC server settings
 rpcuser=<rpc-username>
 rpcpassword=<rpc-password>
@@ -86,6 +84,12 @@ Notes:
   The resulting config value will look like this:
   ```shell
   rpcauth=<rpc-password-salted-hash>
+  ```
+- In case you will be connecting to BTC Mainnet network, ensure to remove the
+  following config skeleton lines:
+  ```shell
+  signet=1
+  [signet]
   ```
 
 ### C. Boot
@@ -136,9 +140,9 @@ the following process.
     sudo systemctl start bitcoind
     ```
 
-## 3. bitcoind Offline Wallet: Create **legacy** wallet and Covenant Key
+## 3. bitcoind Offline Wallet: Create descriptor wallet and Covenant Key
 
-The bitcoind Offline Wallet server will host a **legacy** (non-descriptor) BTC
+The bitcoind Offline Wallet server will host a descriptor BTC
 wallet. This wallet will contain a single address, whose private key will
 be used as the Covenant BTC key to sing PSBTs.
 
@@ -151,7 +155,6 @@ internet access.**
         wallet_name=<wallet_name> \
         passphrase="<passphrase>" \
         load_on_startup=true \
-        descriptors=false
     ```
 
     Flags explanation:
@@ -160,7 +163,6 @@ internet access.**
       (**IMPORTANT, MUST BE SAFELY STORED**)
     - `load_on_startup=true`: Ensures that the wallet is automatically loaded in
       case of server restart
-    - `descriptors=false`: Creates a legacy wallet
 
 2. Create a new address
     ```shell
@@ -176,7 +178,29 @@ internet access.**
 Note: In case you used a non-default bitcoin home directory, also include the
 `-datadir=/path/to/bitcoin/home` flag in all the above `bitcoin-cli` commands.
 
-## 4. Covenant Signer setup
+## 4. bitcoind Offline Wallet: Unlock the wallet
+
+The Covenant Signer expects that the bitcoind Offline Wallet is unlocked when
+trying to contact it. To this end, you'll need to manually unlock the wallet
+before proceeding with the Covenant Signer setup.
+
+To unlock the wallet, execute the following command:
+
+```shell
+bitcoin-cli walletpassphrase "<passphrase>" <unlock_time>
+```
+
+where:
+- `passphrase`: The wallet passphrase specified during the wallet creation step
+- `unlock_time`: How long (**in seconds**) the wallet will remain unlocked for
+
+Notes:
+- You can either unlock the wallet for a long period of time, or set up an
+  automation to unlock it periodically for shorter time periods. In the latter
+  case, the automation will require secure access to the wallet passphrase.
+- In case of server restart, the wallet will need to be unlocked again.
+
+## 5. Covenant Signer setup
 
 ### A. Installation
 
@@ -280,6 +304,19 @@ To start the Covenant Signer, execute the following:
 
 ```shell
 covenant-signer start --config /path/to/signer/home/config.toml
+```
+
+Post-boot, the following log is emitted:
+
+```shell
+{"level":"info","time":"2024-05-07T17:16:18Z","message":"Starting server on 0.0.0.0:9791"}
+```
+
+A successful signing request emits the following log pair:
+
+```shell
+{"level":"debug","path":"/v1/sign-unbonding-tx","traceId":"5b1872eb-6ec6-4d05-bbc9-f88728e3fb72","time":"2024-05-07T19:01:40Z","message":"request received"}
+{"level":"info","path":"/v1/sign-unbonding-tx","traceId":"5b1872eb-6ec6-4d05-bbc9-f88728e3fb72","tracingInfo":{"SpanDetails":null},"requestDuration":42,"time":"2024-05-07T19:01:40Z","message":"Request completed"}
 ```
 
 ## Appendix: Infrastructure-specific guidelines
