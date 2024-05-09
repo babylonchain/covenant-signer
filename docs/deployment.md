@@ -296,14 +296,15 @@ between several services of the Babylon BTC Staking system. The file resides
 under the same directory as `config.toml`.
 
 The file contents can be obtained from
-[here](https://github.com/babylonchain/phase1-devnet/tree/main/parameters).
+[here](https://github.com/babylonchain/phase1-devnet/blob/4f93a64b9791e23643378431cddea6807590d54c/parameters/global-params.json).
 
 ### C. Boot
 
 To start the Covenant Signer, execute the following:
 
 ```shell
-covenant-signer start --config /path/to/signer/home/config.toml
+covenant-signer start --config /path/to/signer/home/config.toml \
+    --params /path/to/signer/home/global-params.toml
 ```
 
 Post-boot, the following log is emitted:
