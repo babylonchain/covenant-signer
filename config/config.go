@@ -87,11 +87,6 @@ pass = "{{ .BtcSignerConfig.Pass }}"
 # Btc network (testnet3|mainnet|regtest|simnet|signet)
 network = "{{ .BtcSignerConfig.Network }}"
 
-[signer-config]
-# required depth of staking transaction before signing of the unbonding transaction
-# will be allowed
-staking-tx-confirmation-depth = {{ .SignerConfig.StakingTxConfirmationDepth }}
-
 [server-config]
 # The address to listen on
 host = "{{ .Server.Host }}"
