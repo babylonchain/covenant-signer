@@ -42,7 +42,8 @@ type TestManager struct {
 	allCovenantKeys       []*btcec.PublicKey
 	covenantQuorum        uint32
 	finalityProviderKey   *btcec.PrivateKey
-	stakerAddress         btcutil.Address
+	walletAddress         btcutil.Address
+	stakerPrivKey         *btcec.PrivateKey
 	stakerPubKey          *btcec.PublicKey
 	magicBytes            []byte
 	requiredUnbondingTime uint16
@@ -113,12 +114,10 @@ func StartManager(
 	err = client.UnlockWallet(60*60*60, passphrase)
 	require.NoError(t, err)
 
-	stakerPubKeyInfo, err := client.RpcClient.GetAddressInfo(walletAddress.EncodeAddress())
+	stakerPrivKey, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
-	stakerPubKeyBytes, err := hex.DecodeString(*stakerPubKeyInfo.PubKey)
-	require.NoError(t, err)
-	stakerPubKey, err := btcec.ParsePubKey(stakerPubKeyBytes)
-	require.NoError(t, err)
+	stakerPubKey := stakerPrivKey.PubKey()
+
 	fpKey, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 
@@ -215,7 +214,8 @@ func StartManager(
 		requiredUnbondingFee:  parsedGlobalParams.Versions[0].UnbondingFee,
 		confirmationDepth:     parsedGlobalParams.Versions[0].ConfirmationDepth,
 		finalityProviderKey:   fpKey,
-		stakerAddress:         walletAddress,
+		walletAddress:         walletAddress,
+		stakerPrivKey:         stakerPrivKey,
 		stakerPubKey:          stakerPubKey,
 		magicBytes:            mb,
 		signerConfig:          appConfig,
@@ -255,7 +255,7 @@ func (tm *TestManager) sendStakingTxToBtc(d *stakingData) *stakingTxSigInfo {
 	tx, err := tm.btcClient.CreateAndSignTx(
 		[]*wire.TxOut{info.StakingOutput, info.OpReturnOutput},
 		d.stakingFeeRate,
-		tm.stakerAddress,
+		tm.walletAddress,
 	)
 	require.NoError(tm.t, err)
 
@@ -333,20 +333,30 @@ func TestSigningUnbondingTx(t *testing.T) {
 
 	unb := tm.createUnbondingTx(stakingTxInfo, stakingData)
 
+	// staker signs unbonding tx
+	unbondingPathInfo, err := stakingTxInfo.stakingInfo.UnbondingPathSpendInfo()
+	require.NoError(t, err)
+
+	stakerSig, err := btcstaking.SignTxWithOneScriptSpendInputFromTapLeaf(
+		unb.unbondingTx,
+		stakingTxInfo.stakingOutput,
+		tm.stakerPrivKey,
+		unbondingPathInfo.RevealedLeaf,
+	)
+	require.NoError(t, err)
+
 	sig, err := signerservice.RequestCovenantSignaure(
 		context.Background(),
 		tm.SigningServerUrl(),
 		10*time.Second,
 		unb.unbondingTx,
+		stakerSig,
 		tm.localCovenantPubKey,
 		stakingTxInfo.stakingOutput.PkScript,
 	)
 
 	require.NoError(t, err)
 	require.NotNil(t, sig)
-
-	unbondingPathInfo, err := stakingTxInfo.stakingInfo.UnbondingPathSpendInfo()
-	require.NoError(t, err)
 
 	// check if signature provided by covenant signer is valid signature over unbonding
 	// path

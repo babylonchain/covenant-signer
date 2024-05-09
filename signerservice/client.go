@@ -6,11 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/babylonchain/covenant-signer/signerservice/handlers"
-	"github.com/babylonchain/covenant-signer/signerservice/types"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/babylonchain/covenant-signer/signerservice/handlers"
+	"github.com/babylonchain/covenant-signer/signerservice/types"
 
 	"github.com/babylonchain/covenant-signer/utils"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -23,6 +24,7 @@ func RequestCovenantSignaure(
 	signerUrl string,
 	timeout time.Duration,
 	unbondingTx *wire.MsgTx,
+	stakerUnbondingSig *schnorr.Signature,
 	covenantMemberPublicKey *btcec.PublicKey,
 	stakingTransactionPkScript []byte,
 ) (*schnorr.Signature, error) {
@@ -36,9 +38,12 @@ func RequestCovenantSignaure(
 
 	pkScriptHex := hex.EncodeToString(stakingTransactionPkScript)
 
+	sigHex := hex.EncodeToString(stakerUnbondingSig.Serialize())
+
 	req := types.SignUnbondingTxRequest{
 		StakingOutputPkScriptHex: pkScriptHex,
 		UnbondingTxHex:           unbondingTxHex,
+		StakerUnbondingSigHex:    sigHex,
 		CovenantPublicKey:        keyHex,
 	}
 

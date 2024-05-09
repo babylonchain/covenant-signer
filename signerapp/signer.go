@@ -116,6 +116,7 @@ func (s *SignerApp) SignUnbondingTransaction(
 	ctx context.Context,
 	stakingOutputPkScript []byte,
 	unbondingTx *wire.MsgTx,
+	stakerUnbondingSig *schnorr.Signature,
 	covnentSignerPubKey *btcec.PublicKey,
 ) (*schnorr.Signature, error) {
 	if err := btcstaking.IsSimpleTransfer(unbondingTx); err != nil {
@@ -217,7 +218,6 @@ func (s *SignerApp) SignUnbondingTransaction(
 	// - staking tx exists on btc chain, is mature and has correct shape according Babylong Params
 	// - unbonding tx output matches the parameters from the staking transaction and the params
 	// We can send request to our remote signer
-
 	stakingInfo, err := btcstaking.BuildStakingInfo(
 		parsedStakingTransaction.OpReturnData.StakerPublicKey.PubKey,
 		[]*btcec.PublicKey{parsedStakingTransaction.OpReturnData.FinalityProviderPublicKey.PubKey},
@@ -236,6 +236,20 @@ func (s *SignerApp) SignUnbondingTransaction(
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Verify that staker signature is correct. This makes sure that this is staker
+	// who requests unbonding or at least someone who has access to staker's private key
+	err = btcstaking.VerifyTransactionSigWithOutput(
+		unbondingTx,
+		parsedStakingTransaction.StakingOutput,
+		unbondingPathInfo.RevealedLeaf.Script,
+		parsedStakingTransaction.OpReturnData.StakerPublicKey.PubKey,
+		stakerUnbondingSig.Serialize(),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("staker unbonding signature verification failed: %w", err)
 	}
 
 	covenantKeyAddress, err := s.pubKeyToAddress(covnentSignerPubKey)

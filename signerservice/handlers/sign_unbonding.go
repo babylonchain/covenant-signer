@@ -3,11 +3,22 @@ package handlers
 import (
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
+
 	"github.com/babylonchain/covenant-signer/signerservice/types"
 	"github.com/babylonchain/covenant-signer/utils"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"net/http"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
+
+func parseSchnorrSigFromHex(hexStr string) (*schnorr.Signature, error) {
+	sigBytes, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return schnorr.ParseSignature(sigBytes)
+}
 
 func (h *Handler) SignUnbonding(request *http.Request) (*Result, *types.Error) {
 	payload := &types.SignUnbondingTxRequest{}
@@ -40,10 +51,17 @@ func (h *Handler) SignUnbonding(request *http.Request) (*Result, *types.Error) {
 		return nil, types.NewErrorWithMsg(http.StatusBadRequest, types.BadRequest, "invalid unbonding transaction")
 	}
 
+	stakerUnbondingSig, err := parseSchnorrSigFromHex(payload.StakerUnbondingSigHex)
+
+	if err != nil {
+		return nil, types.NewErrorWithMsg(http.StatusBadRequest, types.BadRequest, "invalid staker unbonding signature")
+	}
+
 	sig, err := h.s.SignUnbondingTransaction(
 		request.Context(),
 		pkScript,
 		unbondingTx,
+		stakerUnbondingSig,
 		covenantPublicKey,
 	)
 
