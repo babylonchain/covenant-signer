@@ -112,6 +112,7 @@ func outputsAreEqual(a *wire.TxOut, b *wire.TxOut) bool {
 	return true
 }
 
+// TODO: add unit tests for validations
 func (s *SignerApp) SignUnbondingTransaction(
 	ctx context.Context,
 	stakingOutputPkScript []byte,
@@ -174,6 +175,12 @@ func (s *SignerApp) SignUnbondingTransaction(
 
 	if err != nil {
 		return nil, err
+	}
+
+	stakingOutputIndexFromUnbondingTx := unbondingTx.TxIn[0].PreviousOutPoint.Index
+
+	if stakingOutputIndexFromUnbondingTx != uint32(parsedStakingTransaction.StakingOutputIdx) {
+		return nil, fmt.Errorf("unbonding transaction has invalid input index")
 	}
 
 	expectedUnbondingOutputValue := parsedStakingTransaction.StakingOutput.Value - int64(params.UnbondingFee)
