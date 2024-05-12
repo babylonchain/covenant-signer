@@ -82,10 +82,11 @@ included in btc ledger.
 - `current_btc_network`
 8. Previous check should parse values from `staking_tx`: `staker_pk`, `fp_pk`
 `staking_output_index`,`staking_value` and `staking_time`
-9. Check that:
+9. Check that `staking_output_index == unbonding_tx.inputs[0].previous_outpoint.index`
+10. Check that:
  - `global_parameters.min_staking_value <= staking_value && staking_value <= global_parameters.min_staking_value`
  - `global_parameters.min_staking_time <= staking_time && staking_time <= global_parameters.max_staking_time`
-10. Call `BuildUnbondingInfo` with following values:
+11. Call `BuildUnbondingInfo` with following values:
 - `staker_pk`
 - `fp_pk`
 - `global_parameters.covenant_keys`
@@ -95,8 +96,8 @@ included in btc ledger.
 - `current_btc_network`
 
   to build `expected_output`
-11. Check `unbonding_tx.output == expected_output` matches `expected_output`
-12. Call `BuildStakingInfo` with following values:
+12. Check `unbonding_tx.output == expected_output` matches `expected_output`
+13. Call `BuildStakingInfo` with following values:
 - `staker_pk`
 - `fp_pk`
 - `global_parameters.covenant_keys`
@@ -106,7 +107,7 @@ included in btc ledger.
 - `current_btc_network`
 
   to build orignal `unbonding_script`
-13. Call `VerifyTransactionSigWithOutput` with following data:
+14. Call `VerifyTransactionSigWithOutput` with following data:
 - `unbonding_tx`
 - `staking_tx.outputs[staking_output_index]`
 - `unbonding_script`
