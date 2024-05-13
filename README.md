@@ -105,7 +105,7 @@ It involves the following steps:
 3. *Network Launch*: The committee members set up and launch their covenant
    signer program with the specified parameters prior to the network launch.
    They share the address their server listens to for incoming requests, so
-   that on network launch such requeests can be routed to their servers.
+   that on network launch such requests can be routed to their servers.
 
 The [deployment guide](/docs/deployment.md), covers the details on how to set
 up all the required components. For the *Keys Generation* part of the ceremony,

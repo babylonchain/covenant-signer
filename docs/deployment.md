@@ -32,7 +32,7 @@ operations on the bitcoind Offline Wallet.
 
 Offline Wallet:
 - An instance with at least 4G RAM and 2 vCPUs is expected
-- At least 10G of persistent storage should available for the BTC Wallet
+- At least 10G of persistent storage should be available for the BTC Wallet
 
 Full Node:
 - An instance with at least 4G RAM and 2 vCPUs is expected
@@ -271,8 +271,8 @@ bitcoin-cli -rpcwallet=<wallet-name> backupwallet /path/to/backup/wallet.dat
 bitcoin-cli restorewallet <wallet-name> /path/to/backup/wallet.dat
 ```
 
-*Note*: We recommend a frequent backing up mechanism. See the prior backups
-section.
+*Note*: We recommend creating multiple backups of the wallet and
+storing them in separate places.
 
 ## 4. Covenant Signer setup
 
