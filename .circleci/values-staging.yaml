@@ -24,7 +24,7 @@ deployment:
   nodeSelector:
     workload: "staging"
   annotations:
-    configmap.reloader.stakater.com/reload: "covenant-signer, phase1-global-config"
+    configmap.reloader.stakater.com/reload: "covenant-signerIDX, phase1-global-config"
 service:
   enabled: true
   type: NodePort
@@ -53,7 +53,7 @@ ingress:
             pathType: Prefix
             backend:
               service:
-                name: covenant-signer
+                name: covenant-signerIDX
                 port:
                   name: signer
 externalDns:
