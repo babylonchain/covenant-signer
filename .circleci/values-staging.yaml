@@ -1,0 +1,101 @@
+namespace: phase-1-staging
+name: covenant-signer
+deployment:
+  image: 490721144737.dkr.ecr.us-east-1.amazonaws.com/covenant-signer
+  version: REPLACEME
+  replicas: 1
+  ports:
+    - protocol: TCP
+      containerPort: 9791
+      name: signer
+  volumes:
+    - name: covenant-signer-configmap
+      projected:
+        sources:
+          - configMap:
+              name: covenant-signer
+          - configMap:
+              name: phase1-global-config
+  volumeMounts:
+    - name: covenant-signer-configs
+      mountPath: /home/covenant-signer/.signer
+  command: |
+    covenant-signer start --config /home/covenant-signer/.signer/config.toml
+  # TODO: Enable nodeSelector once nodegroups are provisioned
+  # nodeSelector:
+  #   workload: "staging"
+  annotations:
+    configmap.reloader.stakater.com/reload: "covenant-signer, phase1-global-config"
+service:
+  enabled: true
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 9791
+      targetPort: signer
+      name: signer
+ingress:
+  enabled: true
+  groupName: "testnet3-internal"
+  tlsCertArn: arn:aws:acm:us-east-2:490721144737:certificate/46965f73-18c3-4b1e-9eb2-b09d87e53af1
+  scheme: "internal"
+  hosts:
+    - host: COVENANT_SIGNER_FQDN
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ssl-redirect
+                port:
+                  name: use-annotation
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: covenant-signer
+                port:
+                  name: signer
+configFiles:
+  config.toml: |
+    # This is a TOML config file.
+    # For more information, see https://github.com/toml-lang/toml
+
+    # There are two btc related configs
+    # 1. [btc-config] is config for btc full node which should have transaction indexing
+    # enabled. This node should be synced and can be open to the public.
+    # 2. [btc-signer-config] is config for bitcoind daemon which should have only
+    # wallet functionality, it should run in separate network. This bitcoind instance
+    # will be used to sign psbt's
+    [btc-config]
+    # Btc node host
+    host = "bitcoind-staging.bitcoind-signet:38332"
+    # Btc node user
+    user = BTC_USER
+    # Btc node password
+    pass = BTC_PASSWORD
+    # Btc network (testnet3|mainnet|regtest|simnet|signet)
+    network = "signet"
+
+    [btc-signer-config]
+    # Btc node host
+    host = "bitcoind-offline-wallet-IDX.bitcoind-signet:38332/wallet/covenant"
+    # Btc node user
+    user = BTC_USER
+    # Btc node password
+    pass = BTC_PASSWORD
+    # Btc network (testnet3|mainnet|regtest|simnet|signet)
+    network = "signet"
+
+    [server-config]
+    # The address to listen on
+    host = "0.0.0.0"
+    # The port to listen on
+    port = 9791
+    # Read timeout in seconds
+    read-timeout = 15
+    # Write timeout in seconds
+    write-timeout = 15
+    # Idle timeout in seconds
+    idle-timeout = 120
