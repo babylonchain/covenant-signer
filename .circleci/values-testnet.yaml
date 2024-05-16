@@ -9,7 +9,7 @@ deployment:
       containerPort: 9791
       name: signer
   volumes:
-    - name: covenant-signer-configmap
+    - name: covenant-signer-configs
       projected:
         sources:
           - configMap:
