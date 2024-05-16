@@ -85,6 +85,8 @@ signet network):
 ```shell
 # Accept command line and JSON-RPC commands
 server=1
+# Enable transaction indexing
+txindex=1
 # RPC server settings
 rpcuser=<rpc-username>
 rpcpassword=<rpc-password>
@@ -93,11 +95,11 @@ rpcpassword=<rpc-password>
 # node will operate; for this example, utilizing signet
 signet=1
 [signet]
-# port your bitcoin node will listen for incoming requests
+# Port your bitcoin node will listen for incoming requests;
 # below port is the canonical port for signet,
-# for mainnet, typically 8332 is used.
+# for mainnet, typically 8332 is used
 rpcport=38332
-# address your bitcoin node will listen for incoming requests
+# Address your bitcoin node will listen for incoming requests
 rpcbind=0.0.0.0
 # Optional: Needed for remote node connectivity
 rpcallowip=0.0.0.0/0
