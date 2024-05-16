@@ -1,5 +1,5 @@
 namespace: phase-1-staging
-name: covenant-signer
+name: covenant-signerIDX
 deployment:
   image: 490721144737.dkr.ecr.us-east-1.amazonaws.com/covenant-signer
   version: REPLACEME
