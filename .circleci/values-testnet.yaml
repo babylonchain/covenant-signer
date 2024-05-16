@@ -13,7 +13,7 @@ deployment:
       projected:
         sources:
           - configMap:
-              name: covenant-signer
+              name: covenant-signerIDX
           - configMap:
               name: phase1-global-config
   volumeMounts:
