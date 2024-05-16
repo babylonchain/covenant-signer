@@ -39,7 +39,7 @@ ingress:
   tlsCertArn: arn:aws:acm:us-east-2:490721144737:certificate/46965f73-18c3-4b1e-9eb2-b09d87e53af1
   scheme: "internet-facing"
   hosts:
-    - host: COVENANT_SIGNER_FQDN
+    - host: covenant-signerIDX.COVENANT_SIGNER_DOMAIN
       http:
         paths:
           - path: /
@@ -56,6 +56,9 @@ ingress:
                 name: covenant-signer
                 port:
                   name: signer
+externalDns:
+  fqdn: covenant-signerIDX.COVENANT_SIGNER_DOMAIN
+  ttl: 60
 configFiles:
   config.toml: |
     # This is a TOML config file.
