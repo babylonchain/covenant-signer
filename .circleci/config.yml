@@ -110,10 +110,11 @@ jobs:
             HELM_VALUES=/home/circleci/project/.circleci/values-staging.yaml
             for idx in `seq 0 2`
             do
-              sed -i "s/IDX/$idx/g" $HELM_VALUES
+              cp $HELM_VALUES /tmp/covenant-signer$idx.yaml
+              sed -i "s/IDX/$idx/g" /tmp/covenant-signer$idx.yaml
               helm upgrade --install --debug --dry-run \
                 -n $DEPLOY_STAGING_NAMESPACE \
-                --values $HELM_VALUES \
+                --values /tmp/covenant-signer$idx.yaml  \
                 --version $HELM_CHART_VERSION \
                 --set deployment.version=$CIRCLE_SHA1 \
                 covenant-signer$idx $HELM_CHART_REPO
@@ -124,10 +125,11 @@ jobs:
             HELM_VALUES=/home/circleci/project/.circleci/values-staging.yaml
             for idx in `seq 0 2`
             do
-              sed -i "s/IDX/$idx/g" $HELM_VALUES
+              cp $HELM_VALUES /tmp/covenant-signer$idx.yaml
+              sed -i "s/IDX/$idx/g" /tmp/covenant-signer$idx.yaml
               helm upgrade --install --debug --atomic --wait \
                 -n $DEPLOY_STAGING_NAMESPACE --create-namespace \
-                --values $HELM_VALUES \
+                --values /tmp/covenant-signer$idx.yaml \
                 --version $HELM_CHART_VERSION \
                 --set deployment.version=$CIRCLE_SHA1 \
                 covenant-signer$idx $HELM_CHART_REPO
@@ -159,10 +161,11 @@ jobs:
             HELM_VALUES=/home/circleci/project/.circleci/values-testnet.yaml
             for idx in `seq 0 2`
             do
-              sed -i "s/IDX/$idx/g" $HELM_VALUES
+              cp $HELM_VALUES /tmp/covenant-signer$idx.yaml
+              sed -i "s/IDX/$idx/g" /tmp/covenant-signer$idx.yaml
               helm upgrade --install --debug --dry-run \
                 -n $DEPLOY_TESTNET_NAMESPACE \
-                --values $HELM_VALUES \
+                --values /tmp/covenant-signer$idx.yaml \
                 --version $HELM_CHART_VERSION \
                 --set deployment.version=$CIRCLE_SHA1 \
                 covenant-signer$idx $HELM_CHART_REPO
@@ -173,10 +176,11 @@ jobs:
             HELM_VALUES=/home/circleci/project/.circleci/values-testnet.yaml
             for idx in `seq 0 2`
             do
-              sed -i "s/IDX/$idx/g" $HELM_VALUES
+              cp $HELM_VALUES /tmp/covenant-signer$idx.yaml
+              sed -i "s/IDX/$idx/g" /tmp/covenant-signer$idx.yaml
               helm upgrade --install --debug --atomic --wait \
                 -n $DEPLOY_TESTNET_NAMESPACE --create-namespace \
-                --values $HELM_VALUES \
+                --values /tmp/covenant-signer$idx.yaml \
                 --version $HELM_CHART_VERSION \
                 --set deployment.version=$CIRCLE_SHA1 \
                 covenant-signer$idx $HELM_CHART_REPO
