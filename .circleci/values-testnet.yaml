@@ -21,9 +21,8 @@ deployment:
       mountPath: /home/covenant-signer/.signer
   command: |
     covenant-signer start --config /home/covenant-signer/.signer/config.toml
-  # TODO: Enable nodeSelector once nodegroups are provisioned
-  # nodeSelector:
-  #   workload: "btc"
+  nodeSelector:
+    workload: "btc"
   annotations:
     configmap.reloader.stakater.com/reload: "covenant-signer, phase1-global-config"
 service:
