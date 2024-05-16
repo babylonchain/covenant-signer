@@ -74,9 +74,9 @@ configFiles:
     # Btc node host
     host = "bitcoind.bitcoind-signet:38332"
     # Btc node user
-    user = BTC_USER
+    user = "BTC_USER"
     # Btc node password
-    pass = BTC_PASSWORD
+    pass = "BTC_PASSWORD"
     # Btc network (testnet3|mainnet|regtest|simnet|signet)
     network = "signet"
 
@@ -84,9 +84,9 @@ configFiles:
     # Btc node host
     host = "bitcoind-offline-wallet-IDX.bitcoind-signet:38332/wallet/covenant"
     # Btc node user
-    user = BTC_USER
+    user = "BTC_USER"
     # Btc node password
-    pass = BTC_PASSWORD
+    pass = "BTC_PASSWORD"
     # Btc network (testnet3|mainnet|regtest|simnet|signet)
     network = "signet"
 
