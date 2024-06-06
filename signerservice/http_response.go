@@ -2,8 +2,8 @@ package signerservice
 
 import (
 	"encoding/json"
-	"github.com/babylonchain/covenant-signer/signerservice/handlers"
-	"github.com/babylonchain/covenant-signer/signerservice/types"
+	"github.com/babylonchain/covenant-signer-private/signerservice/handlers"
+	"github.com/babylonchain/covenant-signer-private/signerservice/types"
 	logger "github.com/rs/zerolog"
 	"net/http"
 )

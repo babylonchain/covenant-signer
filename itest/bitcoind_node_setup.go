@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/babylonchain/covenant-signer/itest/containers"
+	"github.com/babylonchain/covenant-signer-private/itest/containers"
 	"github.com/stretchr/testify/require"
 )
 

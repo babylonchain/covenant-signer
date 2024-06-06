@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/babylonchain/babylon/btcstaking"
-	"github.com/babylonchain/covenant-signer/btcclient"
+	"github.com/babylonchain/covenant-signer-private/btcclient"
 )
 
 // PrivKeySigner is a signer that uses a private key from connected bitcoind node

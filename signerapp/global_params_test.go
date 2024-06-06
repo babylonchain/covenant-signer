@@ -13,7 +13,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/stretchr/testify/require"
 
-	"github.com/babylonchain/covenant-signer/signerapp"
+	"github.com/babylonchain/covenant-signer-private/signerapp"
 )
 
 var (

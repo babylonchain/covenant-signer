@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/babylonchain/covenant-signer/signerservice/handlers"
-	"github.com/babylonchain/covenant-signer/signerservice/types"
+	"github.com/babylonchain/covenant-signer-private/signerservice/handlers"
+	"github.com/babylonchain/covenant-signer-private/signerservice/types"
 
-	"github.com/babylonchain/covenant-signer/utils"
+	"github.com/babylonchain/covenant-signer-private/utils"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/wire"

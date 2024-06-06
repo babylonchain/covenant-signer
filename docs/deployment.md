@@ -237,7 +237,7 @@ Notes:
   `-datadir=/path/to/bitcoin/home` flag in all the above `bitcoin-cli` commands.
 - The BTC public key of the covenant should be included in the global
   parameters of the network you operate in order for your covenant emulator to
-  be included in the committee. 
+  be included in the committee.
 
 ### 3.2. Unlock the wallet
 
@@ -304,10 +304,10 @@ Install Go by following the instructions on the official Go installation guide.
 To get started, clone the repository to your local machine from GitHub; please
 use the version according to the phase-1 system guidelines --
 you can find all versions in the official
-[releases](https://github.com/babylonchain/covenant-signer/releases) page.
+[releases](https:/github.com/babylonchain/covenant-signer-private/releases) page.
 
 ```shell
-git clone https://github.com/babylonchain/covenant-signer.git
+git clone https://github.com/babylonchain/covenant-signer-private.git
 cd covenant-signer
 git checkout <release-tag>
 ```

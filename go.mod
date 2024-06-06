@@ -1,4 +1,4 @@
-module github.com/babylonchain/covenant-signer
+module github.com/babylonchain/covenant-signer-private
 
 go 1.21.6
 
@@ -46,6 +46,7 @@ require (
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.4
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/google/uuid v1.4.0
+	github.com/prometheus/client_golang v1.18.0
 	github.com/rs/zerolog v1.32.0
 )
 
@@ -244,7 +245,6 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.18.0 // indirect
 	github.com/prometheus/client_model v0.6.0 // indirect
 	github.com/prometheus/common v0.47.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect

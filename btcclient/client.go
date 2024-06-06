@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/babylonchain/covenant-signer/config"
+	"github.com/babylonchain/covenant-signer-private/config"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"

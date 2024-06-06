@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	m "github.com/babylonchain/covenant-signer/observability/metrics"
-	"github.com/babylonchain/covenant-signer/signerservice/handlers"
-	"github.com/babylonchain/covenant-signer/signerservice/middlewares"
+	m "github.com/babylonchain/covenant-signer-private/observability/metrics"
+	"github.com/babylonchain/covenant-signer-private/signerservice/handlers"
+	"github.com/babylonchain/covenant-signer-private/signerservice/middlewares"
 	"github.com/rs/zerolog/log"
 
-	"github.com/babylonchain/covenant-signer/config"
-	s "github.com/babylonchain/covenant-signer/signerapp"
+	"github.com/babylonchain/covenant-signer-private/config"
+	s "github.com/babylonchain/covenant-signer-private/signerapp"
 	"github.com/go-chi/chi/v5"
 )
 

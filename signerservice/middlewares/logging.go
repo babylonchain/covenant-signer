@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	"github.com/babylonchain/covenant-signer/observability/tracing"
+	"github.com/babylonchain/covenant-signer-private/observability/tracing"
 	"net/http"
 	"time"
 
