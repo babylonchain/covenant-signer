@@ -12,7 +12,7 @@ import (
 
 	"github.com/babylonchain/babylon/btcstaking"
 	staking "github.com/babylonchain/babylon/btcstaking"
-
+	"github.com/babylonchain/networks/parameters/parser"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -142,8 +142,8 @@ func StartManager(
 	appConfig.Server.Host = "127.0.0.1"
 	appConfig.Server.Port = 10090
 
-	testParams := signerapp.VersionedGlobalParams{}
-
+	testParams := parser.VersionedGlobalParams{}
+	testParams.ActivationHeight = 1
 	testParams.StakingCap = 10000000000
 	testParams.Tag = hex.EncodeToString(mb)
 	testParams.CovenantPks = []string{
@@ -161,13 +161,13 @@ func StartManager(
 	testParams.ConfirmationDepth = 10
 
 	// TODO: Update tests to create json file and read from it.
-	globalParams := signerapp.GlobalParams{
-		Versions: []*signerapp.VersionedGlobalParams{
+	globalParams := parser.GlobalParams{
+		Versions: []*parser.VersionedGlobalParams{
 			&testParams,
 		},
 	}
 
-	parsedGlobalParams, err := signerapp.ParseGlobalParams(&globalParams)
+	parsedGlobalParams, err := parser.ParseGlobalParams(&globalParams)
 	require.NoError(t, err)
 
 	parsedconfig, err := appConfig.Parse()
@@ -180,7 +180,7 @@ func StartManager(
 	app := signerapp.NewSignerApp(
 		signer,
 		chainInfo,
-		parsedGlobalParams,
+		&signerapp.VersionedParamsRetriever{parsedGlobalParams},
 		netParams,
 	)
 

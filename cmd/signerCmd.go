@@ -35,7 +35,7 @@ var runSignerCmd = &cobra.Command{
 			return err
 		}
 
-		parsedGlobalParams, err := signerapp.NewGlobalParams(globalParamPath)
+		parsedGlobalParams, err := signerapp.NewVersionedParamsRetriever(globalParamPath)
 
 		if err != nil {
 			return err
