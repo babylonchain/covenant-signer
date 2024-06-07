@@ -51,7 +51,7 @@ jobs:
           path: ./
           build-path: ./
           tag: "$CIRCLE_SHA1,$CIRCLE_TAG"
-          repo: "$CIRCLE_PROJECT_REPONAME"
+          repo: "covenant-signer"
       - run:
           name: Save Docker image to export it to workspace
           command: |
@@ -79,7 +79,7 @@ jobs:
       - aws-ecr/push-image:
           registry-id: AWS_ECR_REGISTRY_ID
           region: "$AWS_REGION"
-          repo: "$CIRCLE_PROJECT_REPONAME"
+          repo: "covenant-signer"
           tag: "$CIRCLE_SHA1,$CIRCLE_TAG"
 
 workflows:
