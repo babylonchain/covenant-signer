@@ -201,7 +201,7 @@ that it can be used by the covenant signer.
 
 The bitcoind Offline Wallet server will host a descriptor BTC
 wallet. This wallet will contain a single address, whose private key will
-be used as the Covenant BTC key to sing PSBTs.
+be used as the Covenant BTC key to sign PSBTs.
 
 **Throughout this whole process, the bitcoind Offline Wallet should not have
 internet access.**
