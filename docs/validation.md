@@ -62,7 +62,7 @@ Operating on:
 
 Following steps must be taken to validate incoming signing request:
 1. Check that all data in the request has expected number of bytes, and correctly
-de-serializes to expected objects.
+deserializes to expected objects.
 2. Check that un-bonding transaction has correct the shape
   - `len(unbonding_tx.inputs) == 1`
   - `len(unbonding_tx.outputs) == 1`
@@ -116,5 +116,5 @@ included in btc ledger.
 
   to verify staker signature over un-bonding transaction
 
-After all validations succeed create valid Schnnor signature over `unbonding_tx`
+After all validations succeed create valid Schnorr signature over `unbonding_tx`
 and return it to the caller.
